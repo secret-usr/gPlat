@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "dotNetConsoleApp1": {
+      "commandName": "Project",
+      "remoteDebugEnabled": true
+    }
+  }
+}

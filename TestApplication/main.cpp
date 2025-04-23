@@ -2,13 +2,13 @@
 #include <chrono>
 #include <thread>
 
-#include "hello.h"
+#include "..//include//hello.h"
 
 int main()
 {
 	printf("sizeof(char)=%d\n", sizeof(char));
-    for (int i = 0; i < 10; i++) {
-        printf("%s 向你问好! %d\n", "TestApplication", i);
+    for (int i = 0; i < 100; i++) {
+        printf("%s 向你问好啦!!! %d\n", "TestApplication", i);
         hello();
         hello(i);
         hello2();

@@ -8,7 +8,7 @@
 
 int main()
 {
-	signal(SIGHUP, SIG_IGN);  // 忽略 SIGHUP 信号
+	//signal(SIGHUP, SIG_IGN);  // 忽略 SIGHUP 信号
 	printf("sizeof(char)=%d\n", sizeof(char));
     for (int i = 0; i < 200; i++) {
         printf("%s 向你问好啦!!! %d\n", "TestApplication", i);

@@ -76,9 +76,13 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <RemoteOutRelDir>$(Platform)/$(Configuration)</RemoteOutRelDir>
+    <OutDir>$(ProjectDir)..\$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="ngx_c_conf.cpp" />
+    <ClCompile Include="ngx_setproctitle.cpp" />
+    <ClCompile Include="ngx_string.cpp" />
   </ItemGroup>
   <ItemGroup>
   </ItemGroup>

@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="ngx_c_conf.cpp">
+      <Filter>nginx</Filter>
+    </ClCompile>
+    <ClCompile Include="ngx_string.cpp">
+      <Filter>nginx</Filter>
+    </ClCompile>
+    <ClCompile Include="ngx_setproctitle.cpp">
+      <Filter>nginx</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="nginx">
+      <UniqueIdentifier>{d47eef12-822f-4157-b971-a1262ad7ac1d}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

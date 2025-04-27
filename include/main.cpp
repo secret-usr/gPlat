@@ -1,4 +1,7 @@
 ﻿#include <cstdio>
+//#include "hello.h"
+//#include "ngx_func.h"
+//#include "ngx_c_conf.h"
 
 int main()
 {

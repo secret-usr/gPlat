@@ -79,7 +79,7 @@
     <OutDir>$(ProjectDir)..\$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="nginx.cxx" />
     <ClCompile Include="ngx_c_conf.cpp" />
     <ClCompile Include="ngx_log.cpp" />
     <ClCompile Include="ngx_printf.cpp" />

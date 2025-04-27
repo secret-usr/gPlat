@@ -4,7 +4,7 @@
 #include <unistd.h>  //env
 #include <string.h>
 
-#include "..//include//ngx_global.h"
+#include "ngx_global.h"
 
 //设置可执行程序标题相关函数：分配内存，并且把环境变量拷贝到新内存中来
 void ngx_init_setproctitle()

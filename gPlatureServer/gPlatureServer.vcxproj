@@ -81,10 +81,17 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ngx_c_conf.cpp" />
+    <ClCompile Include="ngx_log.cpp" />
+    <ClCompile Include="ngx_printf.cpp" />
     <ClCompile Include="ngx_setproctitle.cpp" />
     <ClCompile Include="ngx_string.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ngx_c_conf.h" />
+    <ClInclude Include="ngx_func.h" />
+    <ClInclude Include="ngx_global.h" />
+    <ClInclude Include="ngx_macro.h" />
+    <ClInclude Include="ngx_signal.h" />
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>

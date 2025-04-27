@@ -11,10 +11,36 @@
     <ClCompile Include="ngx_setproctitle.cpp">
       <Filter>nginx</Filter>
     </ClCompile>
+    <ClCompile Include="ngx_log.cpp">
+      <Filter>nginx</Filter>
+    </ClCompile>
+    <ClCompile Include="ngx_printf.cpp">
+      <Filter>nginx</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="nginx">
       <UniqueIdentifier>{d47eef12-822f-4157-b971-a1262ad7ac1d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="nginx_h">
+      <UniqueIdentifier>{47a09e95-edb3-46a2-af2e-d8157b0d2887}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ngx_c_conf.h">
+      <Filter>nginx_h</Filter>
+    </ClInclude>
+    <ClInclude Include="ngx_func.h">
+      <Filter>nginx_h</Filter>
+    </ClInclude>
+    <ClInclude Include="ngx_global.h">
+      <Filter>nginx_h</Filter>
+    </ClInclude>
+    <ClInclude Include="ngx_macro.h">
+      <Filter>nginx_h</Filter>
+    </ClInclude>
+    <ClInclude Include="ngx_signal.h">
+      <Filter>nginx_h</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

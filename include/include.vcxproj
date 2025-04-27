@@ -79,10 +79,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="hello.h" />
-    <ClInclude Include="ngx_c_conf.h" />
-    <ClInclude Include="ngx_func.h" />
-    <ClInclude Include="ngx_global.h" />
-    <ClInclude Include="ngx_signal.h" />
   </ItemGroup>
   <ItemDefinitionGroup />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

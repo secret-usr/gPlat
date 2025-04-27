@@ -1,16 +1,24 @@
-﻿#include <stdio.h>
+﻿//整个程序入口函数放这里
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 
-#include "..//include//ngx_c_conf.h"  //和配置文件处理相关的类,名字带c_表示和类有关
-#include "..//include//ngx_signal.h"
-#include "..//include//ngx_func.h"    //各种函数声明
+#include "ngx_c_conf.h"  //和配置文件处理相关的类,名字带c_表示和类有关
+#include "ngx_signal.h"
+#include "ngx_func.h"    //各种函数声明
+
+//本文件用的函数声明
+static void freeresource();
 
 //和设置标题有关的全局量
 char** g_os_argv;            //原始命令行参数数组,在main中会被赋值
-char* gp_envmem = NULL;      //指向自己分配的env环境变量的内存
+char* gp_envmem = NULL;      //指向自己分配的env环境变量的内存，在ngx_init_setproctitle()函数中会被分配内存
 int  g_environlen = 0;       //环境变量所占内存大小
+
+//和进程本身有关的全局量
+pid_t ngx_pid;               //当前进程的pid
 
 int main(int argc, char* const* argv)
 {

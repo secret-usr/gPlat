@@ -23,7 +23,7 @@ public:
 	{	
 		if(m_instance == NULL)
 		{
-			//锁（本来该加锁，但在主线程中率先执行了GetInstance函数，这样就不存在多线程调用该函数导致的需要互斥的问题，因此这里就没有实际加锁）
+			//锁
 			if(m_instance == NULL)
 			{					
 				m_instance = new CConfig();
@@ -40,7 +40,7 @@ public:
 		{
 			if (CConfig::m_instance)
 			{						
-				delete CConfig::m_instance;
+				delete CConfig::m_instance;				
 				CConfig::m_instance = NULL;				
 			}
 		}

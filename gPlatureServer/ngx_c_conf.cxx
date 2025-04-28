@@ -1,4 +1,5 @@
-﻿
+﻿//和处理系统配置文件相关的放这里
+
 //系统头文件放上边
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,7 +47,7 @@ bool CConfig::Load(const char *pconfName)
         if(fgets(linebuf,500,fp) == NULL) //从文件中读数据，每次读一行，一行最多不要超过500个字符 
             continue;
 
-        if(linebuf[0] == 0) //空行？
+        if(linebuf[0] == 0)
             continue;
 
         //处理注释行
@@ -72,14 +73,13 @@ bool CConfig::Load(const char *pconfName)
         char *ptmp = strchr(linebuf,'=');
         if(ptmp != NULL)
         {
-            //LPCConfItem相当于“CConfItem *”，所以千万不要写成LPCConfItem *p_confitem  = new CConfItem;
             LPCConfItem p_confitem = new CConfItem;                    //注意前边类型带LP，后边new这里的类型不带
             memset(p_confitem,0,sizeof(CConfItem));
             strncpy(p_confitem->ItemName,linebuf,(int)(ptmp-linebuf)); //等号左侧的拷贝到p_confitem->ItemName
             strcpy(p_confitem->ItemContent,ptmp+1);                    //等号右侧的拷贝到p_confitem->ItemContent
 
-            Rtrim(p_confitem->ItemName); //自定义函数 截取字符串尾部空格
-			Ltrim(p_confitem->ItemName); //自定义函数 截取字符串首部空格
+            Rtrim(p_confitem->ItemName);
+			Ltrim(p_confitem->ItemName);
 			Rtrim(p_confitem->ItemContent);
 			Ltrim(p_confitem->ItemContent);
 

@@ -17,6 +17,12 @@
       <Filter>nginx</Filter>
     </ClCompile>
     <ClCompile Include="nginx.cxx" />
+    <ClCompile Include="ngx_signal.cxx">
+      <Filter>nginx</Filter>
+    </ClCompile>
+    <ClCompile Include="ngx_process_cycle.cxx">
+      <Filter>nginx</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="nginx">

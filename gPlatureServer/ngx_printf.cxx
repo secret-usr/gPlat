@@ -84,7 +84,7 @@ u_char *ngx_vslprintf(u_char *buf, u_char *last,const char *fmt,va_list args)
             while (*fmt >= '0' && *fmt <= '9')  //如果%后边接的字符是 '0' --'9'之间的内容   ，比如  %16这种；   
             {
                 //第一次 ：width = 1;  第二次 width = 16，所以整个width = 16；
-                width = width * 10 + (*fmt++ - '0');  //(*fmt++ - '0') 是什么，比如 '8' - '0' 的结果是8(字符对应的ASCII码相减), 所以(*fmt++ - '0') 的作用是能把字符8转成数字8
+                width = width * 10 + (*fmt++ - '0');
             }
 
             for ( ;; ) //一些特殊的格式，我们做一些特殊的标记【给一些变量特殊值等等】

@@ -1,8 +1,7 @@
 ﻿
+//一些和字符串处理相关的函数，放这里
 #include <stdio.h>
 #include <string.h>
-
-//一些和字符串处理相关的函数，准备放这里
 
 //截取字符串尾部空格
 void Rtrim(char *string)   
@@ -20,8 +19,8 @@ void Rtrim(char *string)
 //截取字符串首部空格
 void Ltrim(char *string)
 {
-	//size_t len = 0;
-	//len = strlen(string);   
+	size_t len = 0;
+	len = strlen(string);   
 	char *p_tmp = string;
 	if( (*p_tmp) != ' ') //不是以空格开头
 		return;

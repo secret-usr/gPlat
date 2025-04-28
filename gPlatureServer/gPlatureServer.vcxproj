@@ -81,7 +81,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="nginx.cxx" />
-    <ClCompile Include="ngx_c_conf.cpp" />
+    <ClCompile Include="ngx_c_conf.cxx" />
     <ClCompile Include="ngx_log.cpp" />
     <ClCompile Include="ngx_printf.cpp" />
     <ClCompile Include="ngx_setproctitle.cpp" />

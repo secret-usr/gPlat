@@ -4,16 +4,16 @@
     <ClCompile Include="ngx_c_conf.cxx">
       <Filter>nginx</Filter>
     </ClCompile>
-    <ClCompile Include="ngx_string.cpp">
+    <ClCompile Include="ngx_string.cxx">
       <Filter>nginx</Filter>
     </ClCompile>
-    <ClCompile Include="ngx_setproctitle.cpp">
+    <ClCompile Include="ngx_setproctitle.cxx">
       <Filter>nginx</Filter>
     </ClCompile>
-    <ClCompile Include="ngx_log.cpp">
+    <ClCompile Include="ngx_log.cxx">
       <Filter>nginx</Filter>
     </ClCompile>
-    <ClCompile Include="ngx_printf.cpp">
+    <ClCompile Include="ngx_printf.cxx">
       <Filter>nginx</Filter>
     </ClCompile>
     <ClCompile Include="nginx.cxx" />

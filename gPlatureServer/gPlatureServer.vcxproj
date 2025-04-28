@@ -82,10 +82,10 @@
   <ItemGroup>
     <ClCompile Include="nginx.cxx" />
     <ClCompile Include="ngx_c_conf.cxx" />
-    <ClCompile Include="ngx_log.cpp" />
-    <ClCompile Include="ngx_printf.cpp" />
-    <ClCompile Include="ngx_setproctitle.cpp" />
-    <ClCompile Include="ngx_string.cpp" />
+    <ClCompile Include="ngx_log.cxx" />
+    <ClCompile Include="ngx_printf.cxx" />
+    <ClCompile Include="ngx_setproctitle.cxx" />
+    <ClCompile Include="ngx_string.cxx" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ngx_c_conf.h" />

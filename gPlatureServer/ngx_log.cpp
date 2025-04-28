@@ -99,20 +99,20 @@ void ngx_log_stderr(int err, const char *fmt, ...)
 //buf：是个内存，要往这里保存数据
 //last：放的数据不要超过这里
 //err：错误编号，我们是要取得这个错误编号对应的错误字符串，保存到buffer中
-u_char *ngx_log_errno(u_char *buf, u_char *last, int err)
+u_char* ngx_log_errno(u_char* buf, u_char* last, int err)
 {
     //以下代码是我自己改造，感觉作者的代码有些瑕疵
-    char *perrorinfo = strerror(err); //根据资料不会返回NULL;
+    char* perrorinfo = strerror(err); //根据资料不会返回NULL;
     size_t len = strlen(perrorinfo);
 
     //然后我还要插入一些字符串： (%d:)  
-    char leftstr[10] = {0}; 
-    sprintf(leftstr," (%d: ",err);
+    char leftstr[10] = { 0 };
+    sprintf(leftstr, " (%d: ", err);
     size_t leftlen = strlen(leftstr);
 
-    char rightstr[] = ") "; 
+    char rightstr[] = ") ";
     size_t rightlen = strlen(rightstr);
-    
+
     size_t extralen = leftlen + rightlen; //左右的额外宽度
     if ((buf + len + extralen) < last)
     {
@@ -130,22 +130,22 @@ u_char *ngx_log_errno(u_char *buf, u_char *last, int err)
 //level:一个等级数字，我们把日志分成一些等级，以方便管理、显示、过滤等等，如果这个等级数字比配置文件中的等级数字"LogLevel"大，那么该条信息不被写到日志文件中
 //err：是个错误代码，如果不是0，就应该转换成显示对应的错误信息,一起写到日志文件中，
 //ngx_log_error_core(5,8,"这个XXX工作的有问题,显示的结果是=%s","YYYY");
-void ngx_log_error_core(int level,  int err, const char *fmt, ...)
+void ngx_log_error_core(int level, int err, const char* fmt, ...)
 {
-    u_char  *last;
-    u_char  errstr[NGX_MAX_ERROR_STR+1];   //这个+1也是我放入进来的，本函数可以参考ngx_log_stderr()函数的写法；
+    u_char* last;
+    u_char  errstr[NGX_MAX_ERROR_STR + 1];   //这个+1也是我放入进来的，本函数可以参考ngx_log_stderr()函数的写法；
 
-    memset(errstr,0,sizeof(errstr));  
-    last = errstr + NGX_MAX_ERROR_STR;   
-    
+    memset(errstr, 0, sizeof(errstr));
+    last = errstr + NGX_MAX_ERROR_STR;
+
     struct timeval   tv;
     struct tm        tm;
     time_t           sec;   //秒
-    u_char           *p;    //指向当前要拷贝数据到其中的内存位置
+    u_char* p;    //指向当前要拷贝数据到其中的内存位置
     va_list          args;
 
-    memset(&tv,0,sizeof(struct timeval));    
-    memset(&tm,0,sizeof(struct tm));
+    memset(&tv, 0, sizeof(struct timeval));
+    memset(&tm, 0, sizeof(struct tm));
 
     gettimeofday(&tv, NULL);     //获取当前时间，返回自1970-01-01 00:00:00到现在经历的秒数【第二个参数是时区，一般不关心】        
 
@@ -153,17 +153,17 @@ void ngx_log_error_core(int level,  int err, const char *fmt, ...)
     localtime_r(&sec, &tm);      //把参数1的time_t转换为本地时间，保存到参数2中去，带_r的是线程安全的版本，尽量使用
     tm.tm_mon++;                 //月份要调整下正常
     tm.tm_year += 1900;          //年份要调整下才正常
-    
-    u_char strcurrtime[40]={0};  //先组合出一个当前时间字符串，格式形如：2019/01/08 19:57:11
-    ngx_slprintf(strcurrtime,  
-                    (u_char *)-1,                       //若用一个u_char *接一个 (u_char *)-1,则 得到的结果是 0xffffffff....，这个值足够大
-                    "%4d/%02d/%02d %02d:%02d:%02d",     //格式是 年/月/日 时:分:秒
-                    tm.tm_year, tm.tm_mon,
-                    tm.tm_mday, tm.tm_hour,
-                    tm.tm_min, tm.tm_sec);
-    p = ngx_cpymem(errstr,strcurrtime,strlen((const char *)strcurrtime));  //日期增加进来，得到形如：     2019/01/08 20:26:07
+
+    u_char strcurrtime[40] = { 0 };  //先组合出一个当前时间字符串，格式形如：2019/01/08 19:57:11
+    ngx_slprintf(strcurrtime,
+        (u_char*)-1,                       //若用一个u_char *接一个 (u_char *)-1,则 得到的结果是 0xffffffff....，这个值足够大
+        "%4d/%02d/%02d %02d:%02d:%02d",     //格式是 年/月/日 时:分:秒
+        tm.tm_year, tm.tm_mon,
+        tm.tm_mday, tm.tm_hour,
+        tm.tm_min, tm.tm_sec);
+    p = ngx_cpymem(errstr, strcurrtime, strlen((const char*)strcurrtime));  //日期增加进来，得到形如：     2019/01/08 20:26:07
     p = ngx_slprintf(p, last, " [%s] ", err_levels[level]);                //日志级别增加进来，得到形如：  2019/01/08 20:26:07 [crit] 
-    p = ngx_slprintf(p, last, "%P: ",ngx_pid);                             //支持%P格式，进程id增加进来，得到形如：   2019/01/08 20:50:15 [crit] 2037:
+    p = ngx_slprintf(p, last, "%P: ", ngx_pid);                             //支持%P格式，进程id增加进来，得到形如：   2019/01/08 20:50:15 [crit] 2037:
 
     va_start(args, fmt);                     //使args指向起始的参数
     p = ngx_vslprintf(p, last, fmt, args);   //把fmt和args参数弄进去，组合出来这个字符串
@@ -178,15 +178,15 @@ void ngx_log_error_core(int level,  int err, const char *fmt, ...)
     if (p >= (last - 1))
     {
         p = (last - 1) - 1; //把尾部空格留出来，这里感觉nginx处理的似乎就不对 
-                             //我觉得，last-1，才是最后 一个而有效的内存，而这个位置要保存\0，所以我认为再减1，这个位置，才适合保存\n
+        //我觉得，last-1，才是最后 一个而有效的内存，而这个位置要保存\0，所以我认为再减1，这个位置，才适合保存\n
     }
     *p++ = '\n'; //增加个换行符       
 
     //这么写代码是图方便：随时可以把流程弄到while后边去；大家可以借鉴一下这种写法
     ssize_t   n;
-    while(1) 
-    {        
-        if (level > ngx_log.log_level) 
+    while (1)
+    {
+        if (level > ngx_log.log_level)
         {
             //要打印的这个日志的等级太落后（等级数字太大，比配置文件中的数字大)
             //这种日志就不打印了
@@ -195,11 +195,11 @@ void ngx_log_error_core(int level,  int err, const char *fmt, ...)
         //磁盘是否满了的判断，先算了吧，还是由管理员保证这个事情吧； 
 
         //写日志文件        
-        n = write(ngx_log.fd,errstr,p - errstr);  //文件写入成功后，如果中途
-        if (n == -1) 
+        n = write(ngx_log.fd, errstr, p - errstr);  //文件写入成功后，如果中途
+        if (n == -1)
         {
             //写失败有问题
-            if(errno == ENOSPC) //写失败，且原因是磁盘没空间了
+            if (errno == ENOSPC) //写失败，且原因是磁盘没空间了
             {
                 //磁盘没空间了
                 //没空间还写个毛线啊
@@ -208,9 +208,9 @@ void ngx_log_error_core(int level,  int err, const char *fmt, ...)
             else
             {
                 //这是有其他错误，那么我考虑把这个错误显示到标准错误设备吧；
-                if(ngx_log.fd != STDERR_FILENO) //当前是定位到文件的，则条件成立
+                if (ngx_log.fd != STDERR_FILENO) //当前是定位到文件的，则条件成立
                 {
-                    n = write(STDERR_FILENO,errstr,p - errstr);
+                    n = write(STDERR_FILENO, errstr, p - errstr);
                 }
             }
         }

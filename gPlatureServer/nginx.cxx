@@ -28,7 +28,7 @@ char    *gp_envmem=NULL;        //指向自己分配的env环境变量的内存�
 int     g_daemonized=0;         //守护进程标记，标记是否启用了守护进程模式，0：未启用，1：启用了
 
 //socket相关
-CSocekt g_socekt;               //socket全局对象
+CSocekt g_socket;               //socket全局对象
 
 //和进程本身有关的全局量
 pid_t   ngx_pid;                //当前进程的pid
@@ -88,7 +88,7 @@ int main(int argc, char *const *argv)
         exitcode = 1;
         goto lblexit;
     }        
-    if(g_socekt.Initialize() == false)//初始化socket
+    if(g_socket.Initialize() == false)//初始化socket
     {
         exitcode = 1;
         goto lblexit;

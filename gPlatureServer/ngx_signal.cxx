@@ -1,4 +1,8 @@
 ﻿//和信号有关的函数放这里
+/*
+王健伟老师 《Linux C++通讯架构实战》
+商业级质量的代码，完整的项目，帮你提薪至少10K
+*/
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -90,7 +94,7 @@ int ngx_init_signals()
 //信号处理函数
 //siginfo：这个系统定义的结构中包含了信号产生原因的有关信息
 static void ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)
-{   
+{    
     //printf("来信号了\n");    
     ngx_signal_t    *sig;    //自定义结构
     char            *action; //一个字符串，用于记录一个动作字符串以往日志文件中写
@@ -168,14 +172,13 @@ static void ngx_process_get_status(void)
     {
         //waitpid，有人也用wait,但老师要求大家掌握和使用waitpid即可；这个waitpid说白了获取子进程的终止状态，这样，子进程就不会成为僵尸进程了；
         //第一次waitpid返回一个> 0值，表示成功，后边显示 2019/01/14 21:43:38 [alert] 3375: pid = 3377 exited on signal 9【SIGKILL】
-        //第二次再循环回来，再次调用waitpid会返回一个0(只有waitpid的第三个参数为WNOHANG时waitpid才会返回0)，然后这里有return来退出；
-                //根据资料解释，返回的这个0表示worker子进程并不是立即可用的，waitpid不阻塞，立即返回0.
+        //第二次再循环回来，再次调用waitpid会返回一个0，表示子进程还没结束，然后这里有return来退出；
         pid = waitpid(-1, &status, WNOHANG); //第一个参数为-1，表示等待任何子进程，
                                               //第二个参数：保存子进程的状态信息(大家如果想详细了解，可以百度一下)。
                                                //第三个参数：提供额外选项，WNOHANG表示不要阻塞，让这个waitpid()立即返回        
-        
-        if(pid == 0) 
-        {            
+
+        if(pid == 0) //子进程没结束，会立即返回这个数字，但这里应该不是这个数字【因为一般是子进程退出时会执行到这个函数】
+        {
             return;
         } //end if(pid == 0)
         //-------------------------------

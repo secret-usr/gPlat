@@ -83,7 +83,12 @@
     <ClCompile Include="nginx.cxx" />
     <ClCompile Include="ngx_c_conf.cxx" />
     <ClCompile Include="ngx_c_socket.cxx" />
+    <ClCompile Include="ngx_c_socket_accept.cxx" />
+    <ClCompile Include="ngx_c_socket_conn.cxx" />
+    <ClCompile Include="ngx_c_socket_inet.cxx" />
+    <ClCompile Include="ngx_c_socket_request.cxx" />
     <ClCompile Include="ngx_daemon.cxx" />
+    <ClCompile Include="ngx_event.cxx" />
     <ClCompile Include="ngx_log.cxx" />
     <ClCompile Include="ngx_printf.cxx" />
     <ClCompile Include="ngx_process_cycle.cxx" />

@@ -1,5 +1,8 @@
 ﻿//和开启子进程相关
-
+/*
+王健伟老师 《Linux C++通讯架构实战》
+商业级质量的代码，完整的项目，帮你提薪至少10K
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -145,7 +148,7 @@ static int ngx_spawn_process(int inum,const char *pprocname)
 }
 
 //描述：worker子进程的功能函数，每个woker子进程，就在这里循环着了（无限循环【处理网络事件和定时器事件以对外提供web服务】）
-//     子进程分叉才会走到之类
+//     子进程分叉才会走到这里
 //inum：进程编号【0开始】
 static void ngx_worker_process_cycle(int inum,const char *pprocname) 
 {
@@ -165,7 +168,7 @@ static void ngx_worker_process_cycle(int inum,const char *pprocname)
         //先sleep一下 以后扩充.......
         //printf("worker进程休息1秒");       
         //fflush(stdout); //刷新标准输出缓冲区，把输出缓冲区里的东西打印到标准输出设备上，则printf里的东西会立即输出；
-        sleep(1); //休息1秒       
+        //sleep(1); //休息1秒       
         //usleep(100000);
         //ngx_log_error_core(0,0,"good--这是子进程，编号为%d,pid为%P！",inum,ngx_pid);
         //printf("1212");
@@ -181,6 +184,9 @@ static void ngx_worker_process_cycle(int inum,const char *pprocname)
         //ngx_log_stderr(0,"good--这是子进程，编号为%d,pid为%P",inum,ngx_pid); 
         //ngx_log_error_core(0,0,"good--这是子进程，编号为%d,pid为%P",inum,ngx_pid);
 
+        ngx_process_events_and_timers(); //处理网络事件和定时器事件
+
+
     } //end for(;;)
     return;
 }
@@ -195,6 +201,10 @@ static void ngx_worker_process_init(int inum)
     {
         ngx_log_error_core(NGX_LOG_ALERT,errno,"ngx_worker_process_init()中sigprocmask()失败!");
     }
+        
+    //如下这些代码参照官方nginx里的ngx_event_process_init()函数中的代码
+    g_socket.ngx_epoll_init();           //初始化epoll相关内容，同时 往监听socket上增加监听事件，从而开始让监听端口履行其职责
+    //g_socket.ngx_epoll_listenportstart();//往监听socket上增加监听事件，从而开始让监听端口履行其职责【如果不加这行，虽然端口能连上，但不会触发ngx_epoll_process_events()里边的epoll_wait()往下走】
     
     
     //....将来再扩充代码

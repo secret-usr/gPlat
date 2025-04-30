@@ -29,6 +29,21 @@
     <ClCompile Include="ngx_c_socket.cxx">
       <Filter>nginx</Filter>
     </ClCompile>
+    <ClCompile Include="ngx_c_socket_accept.cxx">
+      <Filter>nginx</Filter>
+    </ClCompile>
+    <ClCompile Include="ngx_c_socket_conn.cxx">
+      <Filter>nginx</Filter>
+    </ClCompile>
+    <ClCompile Include="ngx_c_socket_inet.cxx">
+      <Filter>nginx</Filter>
+    </ClCompile>
+    <ClCompile Include="ngx_c_socket_request.cxx">
+      <Filter>nginx</Filter>
+    </ClCompile>
+    <ClCompile Include="ngx_event.cxx">
+      <Filter>nginx</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="nginx">

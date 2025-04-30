@@ -1,5 +1,8 @@
 ﻿//和日志相关的函数放之类
-
+/*
+王健伟老师 《Linux C++通讯架构实战》
+商业级质量的代码，完整的项目，帮你提薪至少10K
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -86,10 +89,13 @@ void ngx_log_stderr(int err, const char *fmt, ...)
     //往标准错误【一般是屏幕】输出信息    
     write(STDERR_FILENO,errstr,p - errstr); //三章七节讲过，这个叫标准错误，一般指屏幕
 
-    //测试代码：
-    //printf("ngx_log_stderr()处理结果=%s\n",errstr);
-    //printf("ngx_log_stderr()处理结果=%s",errstr);
-    
+    if(ngx_log.fd > STDERR_FILENO) //如果这是个有效的日志文件，本条件肯定成立，此时也才有意义将这个信息写到日志文件
+    {
+        //因为上边已经把err信息显示出来了，所以这里就不要显示了，否则显示重复了
+        err = 0;    //不要再次把错误信息弄到字符串里，否则字符串里重复了
+        p--;*p = 0; //把原来末尾的\n干掉，因为到ngx_log_err_core中还会加这个\n 
+        ngx_log_error_core(NGX_LOG_STDERR,err,(const char *)errstr); 
+    }    
     return;
 }
 
@@ -239,7 +245,7 @@ void ngx_log_init()
 
     //只写打开|追加到末尾|文件不存在则创建【这个需要跟第三参数指定文件访问权限】
     //mode = 0644：文件访问权限， 6: 110    , 4: 100：     【用户：读写， 用户所在组：读，其他：读】 老师在第三章第一节介绍过
-    //ngx_log.fd = open((const char *)plogname,O_WRONLY|O_APPEND|O_CREAT|O_DIRECT,0644);   //绕过内核缓冲区，write()成功则写磁盘必然成功，但效率可能会比较低；
+    //ngx_log.fd = open((const char *)plogname,O_WRONLY|O_APPEND|O_CREAT|O_DIRECT,0644);   //绕过内和缓冲区，write()成功则写磁盘必然成功，但效率可能会比较低；
     ngx_log.fd = open((const char *)plogname,O_WRONLY|O_APPEND|O_CREAT,0644);  
     if (ngx_log.fd == -1)  //如果有错误，则直接定位到 标准错误上去 
     {

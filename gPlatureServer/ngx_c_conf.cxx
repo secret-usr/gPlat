@@ -1,5 +1,8 @@
 ﻿//和处理系统配置文件相关的放这里
-
+/*
+王健伟老师 《Linux C++通讯架构实战》
+商业级质量的代码，完整的项目，帮你提薪至少10K
+*/
 //系统头文件放上边
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,6 +30,7 @@ CConfig::~CConfig()
 		delete (*pos);
 	}//end for
 	m_ConfigItemList.clear(); 
+    return;
 }
 
 //装载配置文件

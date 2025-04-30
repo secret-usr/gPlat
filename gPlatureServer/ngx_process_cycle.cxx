@@ -65,7 +65,8 @@ void ngx_master_process_cycle()
             strcat(title,g_os_argv[i]);
         }//end for
         ngx_setproctitle(title); //设置标题
-    }
+        ngx_log_error_core(NGX_LOG_NOTICE,0,"%s %P 启动并开始运行......!",title,ngx_pid); //设置标题时顺便记录下来进程名，进程id等信息到日志
+    }    
     //首先我设置主进程标题---------end
         
     //从配置文件中读取要创建的worker进程数量
@@ -75,14 +76,12 @@ void ngx_master_process_cycle()
 
     //创建子进程后，父进程的执行流程会返回到这里，子进程不会走进来    
     sigemptyset(&set); //信号屏蔽字为空，表示不屏蔽任何信号
-    //sigaddset(&set, SIGHUP); //-1
     
-    //setvbuf(stdout,NULL,_IONBF,0); //这个函数. 直接将printf缓冲区禁止， printf就直接输出了。
     for ( ;; ) 
     {
 
     //    usleep(100000);
-        ngx_log_error_core(0,0,"haha--这是父进程，pid为%P",ngx_pid);
+        //ngx_log_error_core(0,0,"haha--这是父进程，pid为%P",ngx_pid);
 
         //a)根据给定的参数设置新的mask 并 阻塞当前进程【因为是个空集，所以不阻塞任何信号】
         //b)此时，一旦收到信号，便恢复原先的信号屏蔽【我们原来的mask在上边设置的，阻塞了多达10个信号，从而保证我下边的执行流程不会再次被其他信号截断】
@@ -90,13 +89,14 @@ void ngx_master_process_cycle()
         //d)信号处理函数返回后，sigsuspend返回，使程序流程继续往下走
         //printf("for进来了！\n"); //发现，如果print不加\n，无法及时显示到屏幕上，是行缓存问题，以往没注意；可参考https://blog.csdn.net/qq_26093511/article/details/53255970
 
-    //    sigsuspend(&set); //阻塞在这里，等待一个信号，此时进程是挂起的，不占用cpu时间，只有收到信号才会被唤醒（返回）；
+        sigsuspend(&set); //阻塞在这里，等待一个信号，此时进程是挂起的，不占用cpu时间，只有收到信号才会被唤醒（返回）；
                          //此时master进程完全靠信号驱动干活    
 
-    //    printf("执行到sigsuspend()下边来了\n");        
+//        printf("执行到sigsuspend()下边来了\n");
         
-///        printf("master进程休息1秒\n");      
-        //sleep(1); //休息1秒        
+        //printf("master进程休息1秒\n");      
+        //ngx_log_stderr(0,"haha--这是父进程，pid为%P",ngx_pid); 
+        sleep(1); //休息1秒        
         //以后扩充.......
 
     }// end for(;;)
@@ -135,7 +135,7 @@ static int ngx_spawn_process(int inum,const char *pprocname)
         ngx_worker_process_cycle(inum,pprocname);    //我希望所有worker子进程，在这个函数里不断循环着不出来，也就是说，子进程流程不往下边走;
         break;
 
-    default: //这个应该是父进程分支，直接break;，流程往switch之后走        
+    default: //这个应该是父进程分支，直接break;，流程往switch之后走            
         break;
     }//end switch
 
@@ -145,13 +145,17 @@ static int ngx_spawn_process(int inum,const char *pprocname)
 }
 
 //描述：worker子进程的功能函数，每个woker子进程，就在这里循环着了（无限循环【处理网络事件和定时器事件以对外提供web服务】）
-//     子进程分叉才会走到这里
+//     子进程分叉才会走到之类
 //inum：进程编号【0开始】
 static void ngx_worker_process_cycle(int inum,const char *pprocname) 
 {
+    //设置一下变量
+    ngx_process = NGX_PROCESS_WORKER;  //设置进程的类型，是worker进程
+
     //重新为子进程设置进程名，不要与父进程重复------
     ngx_worker_process_init(inum);
     ngx_setproctitle(pprocname); //设置标题   
+    ngx_log_error_core(NGX_LOG_NOTICE,0,"%s %P 启动并开始运行......!",pprocname,ngx_pid); //设置标题时顺便记录下来进程名，进程id等信息到日志
 
     //暂时先放个死循环，我们在这个循环里一直不出来
     //setvbuf(stdout,NULL,_IONBF,0); //这个函数. 直接将printf缓冲区禁止， printf就直接输出了。
@@ -161,9 +165,9 @@ static void ngx_worker_process_cycle(int inum,const char *pprocname)
         //先sleep一下 以后扩充.......
         //printf("worker进程休息1秒");       
         //fflush(stdout); //刷新标准输出缓冲区，把输出缓冲区里的东西打印到标准输出设备上，则printf里的东西会立即输出；
-        //sleep(1); //休息1秒       
+        sleep(1); //休息1秒       
         //usleep(100000);
-        ngx_log_error_core(0,0,"good--这是子进程，编号为%d,pid为%P！",inum,ngx_pid);
+        //ngx_log_error_core(0,0,"good--这是子进程，编号为%d,pid为%P！",inum,ngx_pid);
         //printf("1212");
         //if(inum == 1)
         //{
@@ -174,7 +178,7 @@ static void ngx_worker_process_cycle(int inum,const char *pprocname)
             //fflush(stdout);
         //}
             
-        //ngx_log_stderr(0,"good--这是子进程，pid为%P",ngx_pid); 
+        //ngx_log_stderr(0,"good--这是子进程，编号为%d,pid为%P",inum,ngx_pid); 
         //ngx_log_error_core(0,0,"good--这是子进程，编号为%d,pid为%P",inum,ngx_pid);
 
     } //end for(;;)
@@ -191,7 +195,7 @@ static void ngx_worker_process_init(int inum)
     {
         ngx_log_error_core(NGX_LOG_ALERT,errno,"ngx_worker_process_init()中sigprocmask()失败!");
     }
-
+    
     
     //....将来再扩充代码
     //....

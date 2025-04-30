@@ -82,6 +82,8 @@
   <ItemGroup>
     <ClCompile Include="nginx.cxx" />
     <ClCompile Include="ngx_c_conf.cxx" />
+    <ClCompile Include="ngx_c_socket.cxx" />
+    <ClCompile Include="ngx_daemon.cxx" />
     <ClCompile Include="ngx_log.cxx" />
     <ClCompile Include="ngx_printf.cxx" />
     <ClCompile Include="ngx_process_cycle.cxx" />
@@ -91,6 +93,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ngx_c_conf.h" />
+    <ClInclude Include="ngx_c_socket.h" />
     <ClInclude Include="ngx_func.h" />
     <ClInclude Include="ngx_global.h" />
     <ClInclude Include="ngx_macro.h" />

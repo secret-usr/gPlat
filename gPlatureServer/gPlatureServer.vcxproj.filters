@@ -23,6 +23,12 @@
     <ClCompile Include="ngx_process_cycle.cxx">
       <Filter>nginx</Filter>
     </ClCompile>
+    <ClCompile Include="ngx_daemon.cxx">
+      <Filter>nginx</Filter>
+    </ClCompile>
+    <ClCompile Include="ngx_c_socket.cxx">
+      <Filter>nginx</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="nginx">
@@ -46,6 +52,9 @@
       <Filter>nginx_h</Filter>
     </ClInclude>
     <ClInclude Include="ngx_signal.h">
+      <Filter>nginx_h</Filter>
+    </ClInclude>
+    <ClInclude Include="ngx_c_socket.h">
       <Filter>nginx_h</Filter>
     </ClInclude>
   </ItemGroup>

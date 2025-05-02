@@ -44,10 +44,12 @@ void CSocekt::ngx_event_accept(lpngx_connection_t oldc)
     {     
         if(use_accept4)
         {
+            //以为listen套接字是非阻塞的，所以即便已完成连接队列为空，accept4()也不会卡在这里；
             s = accept4(oldc->fd, &mysockaddr, &socklen, SOCK_NONBLOCK); //从内核获取一个用户端连接，最后一个参数SOCK_NONBLOCK表示返回一个非阻塞的socket，节省一次ioctl【设置为非阻塞】调用
         }
         else
         {
+            //以为listen套接字是非阻塞的，所以即便已完成连接队列为空，accept()也不会卡在这里；
             s = accept(oldc->fd, &mysockaddr, &socklen);
         }
 
@@ -64,7 +66,7 @@ void CSocekt::ngx_event_accept(lpngx_connection_t oldc)
             //对accept、send和recv而言，事件未发生时errno通常被设置成EAGAIN（意为“再来一次”）或者EWOULDBLOCK（意为“期待阻塞”）
             if(err == EAGAIN) //accept()没准备好，这个EAGAIN错误EWOULDBLOCK是一样的
             {
-                //除非你用一个循环不断的accept()取走所有的连接，不然一般不会有这个错误【我们这里只取一个连接】
+                //除非你用一个循环不断的accept()取走所有的连接，不然一般不会有这个错误【我们这里只取一个连接，也就是accept()一次】
                 return ;
             } 
             level = NGX_LOG_ALERT;
@@ -104,9 +106,9 @@ void CSocekt::ngx_event_accept(lpngx_connection_t oldc)
             return;
         }  //end if(s == -1)
 
-        //走到这里的，表示accept4()成功了        
+        //走到这里的，表示accept4()/accept()成功了        
         //ngx_log_stderr(errno,"accept4成功s=%d",s); //s这里就是 一个句柄了
-        newc = ngx_get_connection(s);
+        newc = ngx_get_connection(s); //这是针对新连入用户的连接，和监听套接字 所对应的连接是两个不同的东西，不要搞混
         if(newc == NULL)
         {
             //连接池中连接不够用，那么就得把这个socekt直接关闭并返回了，因为在ngx_get_connection()中已经写日志了，所以这里不需要写日志了
@@ -133,24 +135,25 @@ void CSocekt::ngx_event_accept(lpngx_connection_t oldc)
             if(setnonblocking(s) == false)
             {
                 //设置非阻塞居然失败
-                ngx_close_accepted_connection(newc);
+                ngx_close_accepted_connection(newc); //回收连接池中的连接（千万不能忘记），并关闭socket
                 return; //直接返回
             }
         }
 
         newc->listening = oldc->listening;                    //连接对象 和监听对象关联，方便通过连接对象找监听对象【关联到监听端口】
         newc->w_ready = 1;                                    //标记可以写，新连接写事件肯定是ready的；【从连接池拿出一个连接时这个连接的所有成员都是0】            
+        
         newc->rhandler = &CSocekt::ngx_wait_request_handler;  //设置数据来时的读处理函数，其实官方nginx中是ngx_http_wait_request_handler()
         //客户端应该主动发送第一次的数据，这里将读事件加入epoll监控
         if(ngx_epoll_add_event(s,                 //socket句柄
-                                1,0,              //读，写
+                                1,0,              //读，写 ,这里读为1，表示客户端应该主动给我服务器发送消息，我服务器需要首先收到客户端的消息；
                                 EPOLLET,          //其他补充标记【EPOLLET(高速模式，边缘触发ET)】
                                 EPOLL_CTL_ADD,    //事件类型【增加，还有删除/修改】                                    
                                 newc              //连接池中的连接
                                 ) == -1)
         {
             //增加事件失败，失败日志在ngx_epoll_add_event中写过了，因此这里不多写啥；
-            ngx_close_accepted_connection(newc);
+            ngx_close_accepted_connection(newc);//回收连接池中的连接（千万不能忘记），并关闭socket
             return; //直接返回
         } 
 
@@ -165,7 +168,7 @@ void CSocekt::ngx_close_accepted_connection(lpngx_connection_t c)
 {
     int fd = c->fd;
     ngx_free_connection(c);
-    c->fd = -1; //官方nginx这么写，但这有意义吗？
+    c->fd = -1; //官方nginx这么写，这么写有意义；
     if(close(fd) == -1)
     {
         ngx_log_error_core(NGX_LOG_ALERT,errno,"CSocekt::ngx_close_accepted_connection()中close(%d)失败!",fd);  

@@ -27,7 +27,7 @@
 //来数据时候的处理，当连接上有数据来的时候，本函数会被ngx_epoll_process_events()所调用  ,官方的类似函数为ngx_http_wait_request_handler();
 void CSocekt::ngx_wait_request_handler(lpngx_connection_t c)
 {  
-    //ngx_log_stderr(errno,"22222222222222222222222.");
+    ngx_log_stderr(errno,"22222222222222222222222.");
    
 
 

@@ -273,10 +273,10 @@ int CSocekt::ngx_epoll_init()
 
 		//往监听socket上增加监听事件，从而开始让监听端口履行其职责【如果不加这行，虽然端口能连上，但不会触发ngx_epoll_process_events()里边的epoll_wait()往下走】
 		if (ngx_epoll_add_event((*pos)->fd,       //socekt句柄
-			1, 0,				//读，写【只关心读事件，所以参数2：readevent=1,而参数3：writeevent=0】
-			0,					//其他补充标记
-			EPOLL_CTL_ADD,		//事件类型【增加，还有删除/修改】
-			c					//连接池中的连接 
+			1, 0,             //读，写【只关心读事件，所以参数2：readevent=1,而参数3：writeevent=0】
+			0,               //其他补充标记
+			EPOLL_CTL_ADD,   //事件类型【增加，还有删除/修改】
+			c                //连接池中的连接 
 		) == -1)
 		{
 			exit(2); //有问题，直接退出，日志 已经写过了
@@ -372,7 +372,8 @@ int CSocekt::ngx_epoll_add_event(int fd,
 int CSocekt::ngx_epoll_process_events(int timer)
 {
 	//等待事件，事件会返回到m_events里，最多返回NGX_MAX_EVENTS个事件【因为我只提供了这些内存】；
-	//阻塞timer这么长时间除非：a)阻塞时间到达 b)阻塞期间收到事件会立刻返回c)调用时有事件也会立刻返回d)如果来个信号，比如你用kill -1 pid测试
+	//如果两次调用epoll_wait()的事件间隔比较长，则可能在epoll的双向链表中，积累了多个事件，所以调用epoll_wait，可能取到多个事件
+	//阻塞timer这么长时间除非：a)阻塞时间到达 b)阻塞期间收到事件【比如新用户连入】会立刻返回c)调用时有事件也会立刻返回d)如果来个信号，比如你用kill -1 pid测试
 	//如果timer为-1则一直阻塞，如果timer为0则立即返回，即便没有任何事件
 	//返回值：有错误发生返回-1，错误在errno中，比如你发个信号过来，就返回-1，错误信息是(4: Interrupted system call)
 	//       如果你等待的是一段时间，并且超时了，则返回0；
@@ -421,9 +422,11 @@ int CSocekt::ngx_epoll_process_events(int timer)
 	{
 		c = (lpngx_connection_t)(m_events[i].data.ptr);           //ngx_epoll_add_event()给进去的，这里能取出来
 		instance = (uintptr_t)c & 1;                             //将地址的最后一位取出来，用instance变量标识, 见ngx_epoll_add_event，该值是当时随着连接池中的连接一起给进来的
+		//取得的是你当时调用ngx_epoll_add_event()的时候，这个连接里边的instance变量的值；
 		c = (lpngx_connection_t)((uintptr_t)c & (uintptr_t)~1); //最后1位干掉，得到真正的c地址
 
 		//仔细分析一下官方nginx的这个判断
+		//过滤过期事件的；
 		if (c->fd == -1)  //一个套接字，当关联一个 连接池中的连接【对象】时，这个套接字值是要给到c->fd的，
 			//那什么时候这个c->fd会变成-1呢？关闭连接时这个fd会被设置为-1，哪行代码设置的-1再研究，但应该不是ngx_free_connection()函数设置的-1
 		{
@@ -436,6 +439,7 @@ int CSocekt::ngx_epoll_process_events(int timer)
 			continue; //这种事件就不处理即可
 		}
 
+		//过滤过期事件的；
 		if (c->instance != instance)
 		{
 			//--------------------以下这些说法来自于资料--------------------------------------
@@ -443,6 +447,7 @@ int CSocekt::ngx_epoll_process_events(int timer)
 			//比如我们用epoll_wait取得三个事件，处理第一个事件时，因为业务需要，我们把这个连接关闭【麻烦就麻烦在这个连接被服务器关闭上了】，但是恰好第三个事件也跟这个连接有关；
 			//因为第一个事件就把socket连接关闭了，显然第三个事件我们是不应该处理的【因为这是个过期事件】，若处理肯定会导致错误；
 			//那我们上述把c->fd设置为-1，可以解决这个问题吗？ 能解决一部分问题，但另外一部分不能解决，不能解决的问题描述如下【这么离奇的情况应该极少遇到】：
+
 			//a)处理第一个事件时，因为业务需要，我们把这个连接【假设套接字为50】关闭，同时设置c->fd = -1;并且调用ngx_free_connection将该连接归还给连接池；
 			//b)处理第二个事件，恰好第二个事件是建立新连接事件，调用ngx_get_connection从连接池中取出的连接非常可能就是刚刚释放的第一个事件对应的连接池中的连接；
 			//c)又因为a中套接字50被释放了，所以会被操作系统拿来复用，复用给了b)【一般这么快就被复用也是醉了】；
@@ -456,19 +461,23 @@ int CSocekt::ngx_epoll_process_events(int timer)
 			ngx_log_error_core(NGX_LOG_DEBUG, 0, "CSocekt::ngx_epoll_process_events()中遇到了instance值改变的过期事件:%p.", c);
 			continue; //这种事件就不处理即可
 		}
+		//存在一种可能性，过期事件没被过滤完整【非常极端】，走下来的；
+
 
 		//能走到这里，我们认为这些事件都没过期，就正常开始处理
 		revents = m_events[i].events;//取出事件类型
 		if (revents & (EPOLLERR | EPOLLHUP)) //例如对方close掉套接字，这里会感应到【换句话说：如果发生了错误或者客户端断连】
 		{
-			//这加上读写标记，方便后续代码处理
+			//这加上读写标记，方便后续代码处理，至于怎么处理，后续再说，这里也是参照nginx官方代码引入的这段代码；
 			revents |= EPOLLIN | EPOLLOUT;   //EPOLLIN：表示对应的链接上有数据可以读出（TCP链接的远端主动关闭连接，也相当于可读事件，因为本服务器小处理发送来的FIN包）
-			//EPOLLOUT：表示对应的连接上可以写入数据发送【写准备好】
-//ngx_log_stderr(errno,"2222222222222222222222222.");
+			//EPOLLOUT：表示对应的连接上可以写入数据发送【写准备好】            
 		}
+
 		if (revents & EPOLLIN)  //如果是读事件
 		{
-			//一个客户端新连入，这个会成立
+			//ngx_log_stderr(errno,"数据来了来了来了 ~~~~~~~~~~~~~.");
+			//一个客户端新连入，这个会成立，
+			//已连接发送数据来，这个也成立；
 			//c->r_ready = 1;               //标记可以读；【从连接池拿出一个连接时这个连接的所有成员都是0】            
 			(this->* (c->rhandler))(c);    //注意括号的运用来正确设置优先级，防止编译出错；【如果是个新客户连入
 			//如果新连接进入，这里执行的应该是CSocekt::ngx_event_accept(c)】            

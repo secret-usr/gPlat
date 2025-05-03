@@ -83,6 +83,7 @@
   <ItemGroup>
     <ClCompile Include="nginx.cxx" />
     <ClCompile Include="ngx_c_conf.cxx" />
+    <ClCompile Include="ngx_c_memory.cxx" />
     <ClCompile Include="ngx_c_socket.cxx" />
     <ClCompile Include="ngx_c_socket_accept.cxx" />
     <ClCompile Include="ngx_c_socket_conn.cxx" />
@@ -98,7 +99,9 @@
     <ClCompile Include="ngx_string.cxx" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ngx_comm.h" />
     <ClInclude Include="ngx_c_conf.h" />
+    <ClInclude Include="ngx_c_memory.h" />
     <ClInclude Include="ngx_c_socket.h" />
     <ClInclude Include="ngx_func.h" />
     <ClInclude Include="ngx_global.h" />

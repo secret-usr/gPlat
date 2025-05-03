@@ -135,7 +135,7 @@ void CSocekt::ngx_event_accept(lpngx_connection_t oldc)
             if(setnonblocking(s) == false)
             {
                 //设置非阻塞居然失败
-                ngx_close_accepted_connection(newc); //回收连接池中的连接（千万不能忘记），并关闭socket
+                ngx_close_connection(newc); //回收连接池中的连接（千万不能忘记），并关闭socket
                 return; //直接返回
             }
         }
@@ -144,16 +144,17 @@ void CSocekt::ngx_event_accept(lpngx_connection_t oldc)
         newc->w_ready = 1;                                    //标记可以写，新连接写事件肯定是ready的；【从连接池拿出一个连接时这个连接的所有成员都是0】            
         
         newc->rhandler = &CSocekt::ngx_wait_request_handler;  //设置数据来时的读处理函数，其实官方nginx中是ngx_http_wait_request_handler()
-        //客户端应该主动发送第一次的数据，这里将读事件加入epoll监控
+        //客户端应该主动发送第一次的数据，这里将读事件加入epoll监控，这样当客户端发送数据来时，会触发ngx_wait_request_handler()被ngx_epoll_process_events()调用
         if(ngx_epoll_add_event(s,                 //socket句柄
                                 1,0,              //读，写 ,这里读为1，表示客户端应该主动给我服务器发送消息，我服务器需要首先收到客户端的消息；
-                                EPOLLET,          //其他补充标记【EPOLLET(高速模式，边缘触发ET)】
+                                0,//EPOLLET,          //其他补充标记【EPOLLET(高速模式，边缘触发ET)】
+                                                    //后续因为实际项目需要，我们采用LT模式【水平触发模式/低速模式】
                                 EPOLL_CTL_ADD,    //事件类型【增加，还有删除/修改】                                    
                                 newc              //连接池中的连接
                                 ) == -1)
         {
             //增加事件失败，失败日志在ngx_epoll_add_event中写过了，因此这里不多写啥；
-            ngx_close_accepted_connection(newc);//回收连接池中的连接（千万不能忘记），并关闭socket
+            ngx_close_connection(newc);//回收连接池中的连接（千万不能忘记），并关闭socket
             return; //直接返回
         } 
 
@@ -163,15 +164,3 @@ void CSocekt::ngx_event_accept(lpngx_connection_t oldc)
     return;
 }
 
-//用户连入，我们accept4()时，得到的socket在处理中产生失败，则资源用这个函数释放【因为这里涉及到好几个要释放的资源，所以写成函数】
-void CSocekt::ngx_close_accepted_connection(lpngx_connection_t c)
-{
-    int fd = c->fd;
-    ngx_free_connection(c);
-    c->fd = -1; //官方nginx这么写，这么写有意义；
-    if(close(fd) == -1)
-    {
-        ngx_log_error_core(NGX_LOG_ALERT,errno,"CSocekt::ngx_close_accepted_connection()中close(%d)失败!",fd);  
-    }
-    return;
-}

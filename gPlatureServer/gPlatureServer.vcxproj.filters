@@ -44,6 +44,9 @@
     <ClCompile Include="ngx_event.cxx">
       <Filter>nginx</Filter>
     </ClCompile>
+    <ClCompile Include="ngx_c_memory.cxx">
+      <Filter>nginx</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="nginx">
@@ -70,6 +73,12 @@
       <Filter>nginx_h</Filter>
     </ClInclude>
     <ClInclude Include="ngx_c_socket.h">
+      <Filter>nginx_h</Filter>
+    </ClInclude>
+    <ClInclude Include="ngx_c_memory.h">
+      <Filter>nginx_h</Filter>
+    </ClInclude>
+    <ClInclude Include="ngx_comm.h">
       <Filter>nginx_h</Filter>
     </ClInclude>
   </ItemGroup>

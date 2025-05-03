@@ -83,12 +83,15 @@
   <ItemGroup>
     <ClCompile Include="nginx.cxx" />
     <ClCompile Include="ngx_c_conf.cxx" />
+    <ClCompile Include="ngx_c_crc32.cxx" />
     <ClCompile Include="ngx_c_memory.cxx" />
+    <ClCompile Include="ngx_c_slogic.cxx" />
     <ClCompile Include="ngx_c_socket.cxx" />
     <ClCompile Include="ngx_c_socket_accept.cxx" />
     <ClCompile Include="ngx_c_socket_conn.cxx" />
     <ClCompile Include="ngx_c_socket_inet.cxx" />
     <ClCompile Include="ngx_c_socket_request.cxx" />
+    <ClCompile Include="ngx_c_threadpool.cxx" />
     <ClCompile Include="ngx_daemon.cxx" />
     <ClCompile Include="ngx_event.cxx" />
     <ClCompile Include="ngx_log.cxx" />
@@ -101,10 +104,15 @@
   <ItemGroup>
     <ClInclude Include="ngx_comm.h" />
     <ClInclude Include="ngx_c_conf.h" />
+    <ClInclude Include="ngx_c_crc32.h" />
+    <ClInclude Include="ngx_c_lockmutex.h" />
     <ClInclude Include="ngx_c_memory.h" />
+    <ClInclude Include="ngx_c_slogic.h" />
     <ClInclude Include="ngx_c_socket.h" />
+    <ClInclude Include="ngx_c_threadpool.h" />
     <ClInclude Include="ngx_func.h" />
     <ClInclude Include="ngx_global.h" />
+    <ClInclude Include="ngx_logiccomm.h" />
     <ClInclude Include="ngx_macro.h" />
     <ClInclude Include="ngx_signal.h" />
   </ItemGroup>

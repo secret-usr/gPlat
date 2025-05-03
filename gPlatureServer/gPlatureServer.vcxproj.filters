@@ -47,6 +47,15 @@
     <ClCompile Include="ngx_c_memory.cxx">
       <Filter>nginx</Filter>
     </ClCompile>
+    <ClCompile Include="ngx_c_slogic.cxx">
+      <Filter>nginx</Filter>
+    </ClCompile>
+    <ClCompile Include="ngx_c_crc32.cxx">
+      <Filter>nginx</Filter>
+    </ClCompile>
+    <ClCompile Include="ngx_c_threadpool.cxx">
+      <Filter>nginx</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="nginx">
@@ -79,6 +88,21 @@
       <Filter>nginx_h</Filter>
     </ClInclude>
     <ClInclude Include="ngx_comm.h">
+      <Filter>nginx_h</Filter>
+    </ClInclude>
+    <ClInclude Include="ngx_c_lockmutex.h">
+      <Filter>nginx_h</Filter>
+    </ClInclude>
+    <ClInclude Include="ngx_c_slogic.h">
+      <Filter>nginx_h</Filter>
+    </ClInclude>
+    <ClInclude Include="ngx_c_threadpool.h">
+      <Filter>nginx_h</Filter>
+    </ClInclude>
+    <ClInclude Include="ngx_c_crc32.h">
+      <Filter>nginx_h</Filter>
+    </ClInclude>
+    <ClInclude Include="ngx_logiccomm.h">
       <Filter>nginx_h</Filter>
     </ClInclude>
   </ItemGroup>

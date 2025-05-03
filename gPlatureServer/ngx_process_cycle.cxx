@@ -68,7 +68,7 @@ void ngx_master_process_cycle()
             strcat(title,g_os_argv[i]);
         }//end for
         ngx_setproctitle(title); //设置标题
-        ngx_log_error_core(NGX_LOG_NOTICE,0,"%s %P 启动并开始运行......!",title,ngx_pid); //设置标题时顺便记录下来进程名，进程id等信息到日志
+        ngx_log_error_core(NGX_LOG_NOTICE,0,"%s %P 【master进程】启动并开始运行......!",title,ngx_pid); //设置标题时顺便记录下来进程名，进程id等信息到日志
     }    
     //首先我设置主进程标题---------end
         
@@ -86,8 +86,12 @@ void ngx_master_process_cycle()
     //    usleep(100000);
         //ngx_log_error_core(0,0,"haha--这是父进程，pid为%P",ngx_pid);
 
+        // sigsuspend(const sigset_t *mask))用于在接收到某个信号之前, 临时用mask替换进程的信号掩码, 并暂停进程执行，直到收到信号为止。
+        // sigsuspend 返回后将恢复调用之前的信号掩码。信号处理函数完成后，进程将继续执行。该系统调用始终返回-1，并将errno设置为EINTR。
+
+        //sigsuspend是一个原子操作，包含4个步骤：
         //a)根据给定的参数设置新的mask 并 阻塞当前进程【因为是个空集，所以不阻塞任何信号】
-        //b)此时，一旦收到信号，便恢复原先的信号屏蔽【我们原来的mask在上边设置的，阻塞了多达10个信号，从而保证我下边的执行流程不会再次被其他信号截断】
+        //b)此时，一旦收到信号，便恢复原先的信号屏蔽【我们原来调用sigprocmask()的mask在上边设置的，阻塞了多达10个信号，从而保证我下边的执行流程不会再次被其他信号截断】
         //c)调用该信号对应的信号处理函数
         //d)信号处理函数返回后，sigsuspend返回，使程序流程继续往下走
         //printf("for进来了！\n"); //发现，如果print不加\n，无法及时显示到屏幕上，是行缓存问题，以往没注意；可参考https://blog.csdn.net/qq_26093511/article/details/53255970
@@ -158,7 +162,12 @@ static void ngx_worker_process_cycle(int inum,const char *pprocname)
     //重新为子进程设置进程名，不要与父进程重复------
     ngx_worker_process_init(inum);
     ngx_setproctitle(pprocname); //设置标题   
-    ngx_log_error_core(NGX_LOG_NOTICE,0,"%s %P 启动并开始运行......!",pprocname,ngx_pid); //设置标题时顺便记录下来进程名，进程id等信息到日志
+    ngx_log_error_core(NGX_LOG_NOTICE,0,"%s %P 【worker进程】启动并开始运行......!",pprocname,ngx_pid); //设置标题时顺便记录下来进程名，进程id等信息到日志
+
+
+    //测试代码，测试线程池的关闭
+    //sleep(5); //休息5秒        
+    //g_threadpool.StopAll(); //测试Create()后立即释放的效果
 
     //暂时先放个死循环，我们在这个循环里一直不出来
     //setvbuf(stdout,NULL,_IONBF,0); //这个函数. 直接将printf缓冲区禁止， printf就直接输出了。
@@ -186,8 +195,17 @@ static void ngx_worker_process_cycle(int inum,const char *pprocname)
 
         ngx_process_events_and_timers(); //处理网络事件和定时器事件
 
+        /*if(false) //优雅的退出
+        {
+            g_stopEvent = 1;
+            break;
+        }*/
 
     } //end for(;;)
+
+    //如果从这个循环跳出来
+    g_threadpool.StopAll();      //考虑在这里停止线程池；
+    g_socket.Shutdown_subproc(); //socket需要释放的东西考虑释放；
     return;
 }
 
@@ -201,7 +219,23 @@ static void ngx_worker_process_init(int inum)
     {
         ngx_log_error_core(NGX_LOG_ALERT,errno,"ngx_worker_process_init()中sigprocmask()失败!");
     }
-        
+
+    //线程池代码，率先创建，至少要比和socket相关的内容优先
+    CConfig *p_config = CConfig::GetInstance();
+    int tmpthreadnums = p_config->GetIntDefault("ProcMsgRecvWorkThreadCount",5); //处理接收到的消息的线程池中线程数量
+    if(g_threadpool.Create(tmpthreadnums) == false)  //创建线程池中线程
+    {
+        //内存没释放，但是简单粗暴退出；
+        exit(-2);
+    }
+    sleep(1); //再休息1秒；
+
+    if(g_socket.Initialize_subproc() == false) //初始化子进程需要具备的一些多线程能力相关的信息
+    {
+        //内存没释放，但是简单粗暴退出；
+        exit(-2);
+    }
+    
     //如下这些代码参照官方nginx里的ngx_event_process_init()函数中的代码
     g_socket.ngx_epoll_init();           //初始化epoll相关内容，同时 往监听socket上增加监听事件，从而开始让监听端口履行其职责
     //g_socket.ngx_epoll_listenportstart();//往监听socket上增加监听事件，从而开始让监听端口履行其职责【如果不加这行，虽然端口能连上，但不会触发ngx_epoll_process_events()里边的epoll_wait()往下走】

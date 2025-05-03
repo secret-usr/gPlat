@@ -72,7 +72,7 @@ struct ngx_connection_s
 	//和发包有关
 	std::atomic<int>          iThrowsendCount;                //发送消息，如果发送缓冲区满了，则需要通过epoll事件来驱动消息的继续发送，所以如果发送缓冲区满，则用这个变量标记
 	char                      *psendMemPointer;               //发送完成后释放用的，整个数据的头指针，其实是 消息头 + 包头 + 包体
-	char                      *psendbuf;                      //发送数据的缓冲区的头指针，其实是包头+包体
+	char                      *psendbuf;                      //发送数据的缓冲区的头指针，开始 其实是包头+包体
 	unsigned int              isendlen;                       //要发送多少数据
 
 	//和回收有关
@@ -124,7 +124,8 @@ private:
 
 	//一些业务处理函数handler
 	void ngx_event_accept(lpngx_connection_t oldc);                       //建立新连接
-	void ngx_wait_request_handler(lpngx_connection_t pConn);              //设置数据来时的读处理函数
+	void ngx_read_request_handler(lpngx_connection_t pConn);              //设置数据来时的读处理函数
+	void ngx_write_request_handler(lpngx_connection_t pConn);             //设置数据发送时的写处理函数
 	void ngx_close_connection(lpngx_connection_t pConn);                  //通用连接关闭函数，资源用这个函数释放【因为这里涉及到好几个要释放的资源，所以写成函数】
 
 	ssize_t recvproc(lpngx_connection_t pConn,char *buff,ssize_t buflen); //接收从客户端来的数据专用函数
@@ -145,7 +146,7 @@ private:
 	void inRecyConnectQueue(lpngx_connection_t pConn);                    //将要回收的连接放到一个队列中来
 
 	//线程相关函数
-	//static void* ServerSendQueueThread(void *threadData);              //专门用来发送数据的线程
+	static void* ServerSendQueueThread(void *threadData);                 //专门用来发送数据的线程
 	static void* ServerRecyConnectionThread(void *threadData);            //专门用来回收连接的线程
 	
 protected:

@@ -1,6 +1,7 @@
 ﻿
 //和网络 中 接受连接【accept】 有关的函数放这里
 /*
+公众号：程序员速成     q群：716480601
 王健伟老师 《Linux C++通讯架构实战》
 商业级质量的代码，完整的项目，帮你提薪至少10K
 */
@@ -143,16 +144,10 @@ void CSocekt::ngx_event_accept(lpngx_connection_t oldc)
         newc->listening = oldc->listening;                    //连接对象 和监听对象关联，方便通过连接对象找监听对象【关联到监听端口】
         //newc->w_ready = 1;                                    //标记可以写，新连接写事件肯定是ready的；【从连接池拿出一个连接时这个连接的所有成员都是0】            
         
-        newc->rhandler = &CSocekt::ngx_wait_request_handler;  //设置数据来时的读处理函数，其实官方nginx中是ngx_http_wait_request_handler()
-        //客户端应该主动发送第一次的数据，这里将读事件加入epoll监控，这样当客户端发送数据来时，会触发ngx_wait_request_handler()被ngx_epoll_process_events()调用
-        /*if(ngx_epoll_add_event(s,                 //socket句柄
-                                1,0,              //读，写 ,这里读为1，表示客户端应该主动给我服务器发送消息，我服务器需要首先收到客户端的消息；
-                                0,//EPOLLET,      //其他补充标记【EPOLLET(高速模式，边缘触发ET)】
-                                                      //后续因为实际项目需要，我们采用LT模式【水平触发模式/低速模式】
-                                EPOLL_CTL_ADD,    //事件类型【增加，还有删除/修改】                                    
-                                newc              //连接池中的连接
-                                ) == -1)
-                                */
+        newc->rhandler = &CSocekt::ngx_read_request_handler;  //设置数据来时的读处理函数，其实官方nginx中是ngx_http_wait_request_handler()
+        newc->whandler = &CSocekt::ngx_write_request_handler; //设置数据发送时的写处理函数。
+
+        //客户端应该主动发送第一次的数据，这里将读事件加入epoll监控，这样当客户端发送数据来时，会触发ngx_wait_request_handler()被ngx_epoll_process_events()调用        
          if(ngx_epoll_oper_event(
                                 s,                  //socekt句柄
                                 EPOLL_CTL_ADD,      //事件类型，这里是增加
@@ -165,6 +160,31 @@ void CSocekt::ngx_event_accept(lpngx_connection_t oldc)
             ngx_close_connection(newc);//关闭socket,这种可以立即回收这个连接，无需延迟，因为其上还没有数据收发，谈不到业务逻辑因此无需延迟；
             return; //直接返回
         }
+        /*
+        else
+        {
+            //打印下发送缓冲区大小
+            int           n;
+            socklen_t     len;
+            len = sizeof(int);
+            getsockopt(s,SOL_SOCKET,SO_SNDBUF, &n, &len);
+            ngx_log_stderr(0,"发送缓冲区的大小为%d!",n); //87040
+
+            n = 0;
+            getsockopt(s,SOL_SOCKET,SO_RCVBUF, &n, &len);
+            ngx_log_stderr(0,"接收缓冲区的大小为%d!",n); //374400
+
+            int sendbuf = 2048;
+            if (setsockopt(s, SOL_SOCKET, SO_SNDBUF,(const void *) &sendbuf,n) == 0)
+            {
+                ngx_log_stderr(0,"发送缓冲区大小成功设置为%d!",sendbuf); 
+            }
+
+             getsockopt(s,SOL_SOCKET,SO_SNDBUF, &n, &len);
+            ngx_log_stderr(0,"发送缓冲区的大小为%d!",n); //87040
+        }
+        */
+        
         break;  //一般就是循环一次就跳出去
     } while (1);   
 

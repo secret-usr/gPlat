@@ -1,6 +1,7 @@
 ﻿
 //和网络 中 连接/连接池 有关的函数放这里
 /*
+公众号：程序员速成     q群：716480601
 王健伟老师 《Linux C++通讯架构实战》
 商业级质量的代码，完整的项目，帮你提薪至少10K
 */
@@ -276,6 +277,13 @@ lblRRTD:
                 //......这将来可能还要做一些是否能释放的判断[在我们写完发送数据代码之后吧]，先预留位置
                 //....
 
+                //我认为，凡是到释放时间的，iThrowsendCount都应该为0；这里我们加点日志判断下
+                if(p_Conn->iThrowsendCount != 0)
+                {
+                    //这确实不应该，打印个日志吧；
+                    ngx_log_stderr(0,"CSocekt::ServerRecyConnectionThread()中到释放时间却发现p_Conn.iThrowsendCount!=0，这个不该发生");
+                    //其他先暂时啥也不干，路程继续往下走，继续去释放吧。
+                }
 
                 //流程走到这里，表示可以释放，那我们就开始释放
                 --pSocketObj->m_totol_recyconnection_n;        //待释放连接队列大小-1

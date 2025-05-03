@@ -1,6 +1,7 @@
 ﻿
 //和网络以及逻辑处理 有关的函数放这里
 /*
+公众号：程序员速成     q群：716480601
 王健伟老师 《Linux C++通讯架构实战》
 商业级质量的代码，完整的项目，帮你提薪至少10K
 */
@@ -177,6 +178,8 @@ bool CLogicSocket::_HandleRegister(lpngx_connection_t pConn,LPSTRUC_MSG_HEADER p
 	CCRC32   *p_crc32 = CCRC32::GetInstance();
     int iSendLen = sizeof(STRUCT_REGISTER);  
     //a)分配要发送出去的包的内存
+
+iSendLen = 65000; //unsigned最大也就是这个值
     char *p_sendbuf = (char *)p_memory->AllocMemory(m_iLenMsgHeader+m_iLenPkgHeader+iSendLen,false);//准备发送的格式，这里是 消息头+包头+包体
     //b)填充消息头
     memcpy(p_sendbuf,pMsgHeader,m_iLenMsgHeader);                   //消息头直接拷贝到这里来
@@ -194,8 +197,8 @@ bool CLogicSocket::_HandleRegister(lpngx_connection_t pConn,LPSTRUC_MSG_HEADER p
     pPkgHeader->crc32   = htonl(pPkgHeader->crc32);		
 
     //f)发送数据包
-    /*msgSend(p_sendbuf);*/
-    if(ngx_epoll_oper_event(
+    msgSend(p_sendbuf);
+    /*if(ngx_epoll_oper_event(
                                 pConn->fd,          //socekt句柄
                                 EPOLL_CTL_MOD,      //事件类型，这里是增加
                                 EPOLLOUT,           //标志，这里代表要增加的标志,EPOLLOUT：可写
@@ -204,9 +207,9 @@ bool CLogicSocket::_HandleRegister(lpngx_connection_t pConn,LPSTRUC_MSG_HEADER p
                                 ) == -1)        
     {
         ngx_log_stderr(0,"1111111111111111111111111111111111111111111111111111111111111!");
-    } 
+    } */
     
-   /*
+    /*
     sleep(100);  //休息这么长时间
     //如果连接回收了，则肯定是iCurrsequence不等了
     if(pMsgHeader->iCurrsequence != pConn->iCurrsequence)
@@ -217,10 +220,10 @@ bool CLogicSocket::_HandleRegister(lpngx_connection_t pConn,LPSTRUC_MSG_HEADER p
     else
     {
         ngx_log_stderr(0,"插座相等哦,%L--%L",pMsgHeader->iCurrsequence,pConn->iCurrsequence);
-    }*/
+    }
     
-
-    ngx_log_stderr(0,"执行了CLogicSocket::_HandleRegister()!");
+    */
+    //ngx_log_stderr(0,"执行了CLogicSocket::_HandleRegister()!");
     return true;
 }
 bool CLogicSocket::_HandleLogIn(lpngx_connection_t pConn,LPSTRUC_MSG_HEADER pMsgHeader,char *pPkgBody,unsigned short iBodyLength)

@@ -5,7 +5,7 @@ VisualStudioVersion = 17.11.35312.102
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gPlatureServer", "gPlatureServer\gPlatureServer.vcxproj", "{531CBA93-B40F-460F-8781-3F9212B8E07A}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gPlature", "gPlature\gPlature.vcxproj", "{AED5EBBD-9873-46BD-9EEA-9552102F840A}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "higplat", "higplat\higplat.vcxproj", "{AED5EBBD-9873-46BD-9EEA-9552102F840A}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestApplication", "TestApplication\TestApplication.vcxproj", "{9EE769DE-FA27-4E23-9D16-51D1C40A9110}"
 EndProject

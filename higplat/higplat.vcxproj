@@ -88,7 +88,10 @@
     <RemoteOutRelDir>$(Platform)/$(Configuration)</RemoteOutRelDir>
   </PropertyGroup>
   <ItemGroup>
-    <ClCompile Include="gPlature.cpp" />
+    <ClCompile Include="higplat.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="qbd.h" />
   </ItemGroup>
   <ItemDefinitionGroup />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -57,7 +57,7 @@ int operateMode
 
 Returns:  BOOL
 F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
-extern "C" { bool CreateQ(const char* lpFileName,
+extern "C" bool CreateQ(const char* lpFileName,
 	int recordSize,
 	int recordNum,
 	int dateType,
@@ -187,5 +187,4 @@ extern "C" { bool CreateQ(const char* lpFileName,
 	close(fd);
 
 	return true;
-}
 }

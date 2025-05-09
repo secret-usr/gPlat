@@ -1,9 +1,7 @@
 #ifndef MSG_H_
 #define MSG_H_
 
-#include <OAIDL.H>
-
-#define MAXMSGLEN 2048   //必须与dq.h中的TYPEMAXSIZE一致
+#define MAXMSGLEN 2048   //必须与qbd.h中的TYPEMAXSIZE一致
 
 enum MSGID
 {
@@ -57,30 +55,30 @@ enum MSGID
 
 typedef struct {
 	int    id;
-	TCHAR  qname[32];
-	TCHAR  itemname[32];
+	char   qname[32];
+	char   itemname[32];
 	int    qbdtype;
 	int    datasize;
 	int    datatype;
-	time_t timestamp;
+	timespec timestamp;
 	int    start;
 	int    count;
 	int    recsize;
 	int    bodysize;
 	int    readptr;
 	int    writeptr;
-	DWORD  error;
+	unsigned int  error;
 	int    subsize;
 	int    offset;
-	TCHAR  ip[16];
+	char   ip[16];
 	int    arraysize;	// used for plc array write
 	int	   eventid;
 	int    eventarg;
-} MSGHEAD, *PMSGHEAD;
+} MSGHEAD, * PMSGHEAD;
 
 typedef struct {
 	MSGHEAD head;
-	BYTE    body[MAXMSGLEN];
+	char    body[MAXMSGLEN];
 } MSGSTRUCT, *PMSGSTRUCT;
 
 //struct BODY_WATCHDOG

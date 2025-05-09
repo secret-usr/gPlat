@@ -1,15 +1,36 @@
 ﻿#include <cstdio>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include "../include/msg.h"
+#include "qbd.h"
 
-void hello() {
-	printf("hello world GYB!\n");
-}
+namespace fs = std::filesystem;
 
-void hello(int a) {
-	printf("%d hello world GYB!\n", a);
-}
+thread_local  unsigned int errorCode = 0;
+char dataQuePath[100];
 
-void hello2() {
-	printf("hello world GYB!----------------\n");
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: gettime
+
+Summary:  Get current time.
+
+Args:     char *timebuf
+buffer to save time
+
+Returns:  void
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+inline void gettime(char * timebuf)
+{
+	struct tm* now;
+	time_t ltime;
+	time(&ltime);
+	now = localtime(&ltime);
+	strftime(timebuf, 20, "%Y-%m-%d %H:%M:%S", now);
 }
 
 extern "C" {
@@ -36,100 +57,94 @@ int operateMode
 
 Returns:  BOOL
 F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
-extern "C" { CreateQ(LPCTSTR  lpFileName,
+extern "C" { bool CreateQ(const char* lpFileName,
 	int recordSize,
 	int recordNum,
 	int dateType,
 	int operateMode,
-	VOID* pType,
+	void* pType,
 	int typeSize)
 {
 	if (recordSize > MAXMSGLEN || typeSize > TYPEMAXSIZE)
 	{
 		errorCode = ERROR_PARAMETER_SIZE;
-		return FALSE;
+		return false;
 	}
 
-	usereason = 0;
-
 	// 检查文件名长度是否超过定义长度
-	if (lstrlen(lpFileName) > MAXDQNAMELENTH)
+	if (strlen(lpFileName) > MAXDQNAMELENTH)
 	{
 		errorCode = ERROR_FILENAME_TOO_LONG;
-		return FALSE;
+		return false;
 	}
 
 	// 形成文件路径全名
-	TCHAR dqFileName[100];
-	wcscpy(dqFileName, dataQuePath);
-	wcscat(dqFileName, lpFileName);
+	char dqFileName[100];
+	strcpy(dqFileName, dataQuePath);
+	strcat(dqFileName, lpFileName);
 
 	// 先查找同名文件删除之
-	HANDLE hFileHand;
-	WIN32_FIND_DATA findFileData;
-	hFileHand = FindFirstFile(dqFileName, &findFileData);
-	if (hFileHand != INVALID_HANDLE_VALUE)
+	if (fs::exists(dqFileName))
 	{
-		if (!DeleteFile(dqFileName))
-		{
+		if (!fs::remove(dqFileName)) {		//C++17
 			errorCode = ERROR_FILE_IN_USE;
-			FindClose(hFileHand);
-			return FALSE;
-		}
-		else
-		{
-			FindClose(hFileHand);
+			return false;
 		}
 	}
 
 	// 创建文件
-	HANDLE hFile;
-	hFile = CreateFile(dqFileName,
-		GENERIC_READ | GENERIC_WRITE,			// open for reading and writing
-		FILE_SHARE_READ | FILE_SHARE_WRITE,		// share for reading and writing
-		NULL,									// no security 
-		CREATE_NEW,								// create if not exist 
-		FILE_ATTRIBUTE_NORMAL,					// normal file 
-		NULL);									// no attr. template 
-	if (hFile == INVALID_HANDLE_VALUE)
-	{
+	try {
+		// 创建父目录（如果不存在）
+		fs::path path(dqFileName);
+		if (path.has_parent_path() && !fs::exists(path.parent_path())) {
+			fs::create_directories(path.parent_path());
+		}
+
+		// 创建文件
+		std::ofstream newfile(dqFileName);
+		if (newfile.is_open()) {
+			newfile.close();
+		}
+		else {
+			errorCode = ERROR_FILE_CREATE_FAILSURE;
+			return false;
+		}
+	}
+	catch (const std::exception& e) {
+		std::cerr << "create file error: " << e.what() << std::endl;
 		errorCode = ERROR_FILE_CREATE_FAILSURE;
-		return FALSE;
+		return false;
 	}
 
 	// 计算文件大小
-	int fileSize;
+	long fileSize;
 	fileSize = recordNum * (recordSize + RECORDHEADSIZE) + QUEUEHEADSIZE + TYPEMAXSIZE;
 
-	// 将文件扩展成指定大小
-	HANDLE hMapFile;
-	hMapFile = CreateFileMapping(hFile,						// Current file handle. 
-		NULL,                           // Default security. 
-		PAGE_READWRITE,                 // Read/write permission. 
-		0,                              // Size of file.
-		fileSize,                       // Size of file. 
-		lpFileName);					// Name of mapping object. 
-	if (hMapFile == NULL)
-	{
-		errorCode = ERROR_CREATE_FILEMAPPINGOBJECT;
-		CloseHandle(hFile);
-		return FALSE;
+	// 1. 创建或打开文件（O_CREAT | O_RDWR 表示不存在则创建，存在则打开可读写）
+	int fd = open(dqFileName, O_CREAT | O_RDWR, 0644);
+	if (fd == -1) {
+		std::cerr << "打开/创建文件失败: " << strerror(errno) << std::endl;
+		return false;
 	}
 
-	// 写文件头，初始化队列头和数据区
-	LPVOID lpMapAddress;
-	lpMapAddress = MapViewOfFile(hMapFile,				// Handle to mapping object. 
-		FILE_MAP_ALL_ACCESS,	// Read/write permission. 
-		0,						// offset where mapping is to begin. 
-		0,						// offset where mapping is to begin.
-		0);						// Map entire file. 
-	if (lpMapAddress == NULL)
-	{
-		errorCode = ERROR_MAPVIEWOFFILE;
-		CloseHandle(hMapFile);
-		CloseHandle(hFile);
-		return FALSE;
+	// 2. 将文件扩展至目标大小
+	if (ftruncate(fd, fileSize) == -1) {
+		std::cerr << "调整文件大小失败: " << strerror(errno) << std::endl;
+		close(fd);
+		return false;
 	}
+
+	// 3. 内存映射文件
+	void* lpMapAddress = mmap(nullptr, fileSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	if (lpMapAddress == MAP_FAILED) {
+		std::cerr << "内存映射失败: " << strerror(errno) << std::endl;
+		close(fd);
+		return false;
+	}
+
+	// 4. 使用映射内存（示例：填充零）
+	memset(lpMapAddress, 0, fileSize);
+
 	QUEUE_HEAD* pDqHead;
 	pDqHead = (QUEUE_HEAD*)lpMapAddress;
 	pDqHead->qbdtype = QUEUE_T;
@@ -142,7 +157,7 @@ extern "C" { CreateQ(LPCTSTR  lpFileName,
 	gettime(pDqHead->createDate);
 	if (pType != 0 && typeSize != 0 && typeSize < TYPEMAXSIZE)
 	{
-		CopyMemory((BYTE*)lpMapAddress + recordNum * (recordSize + RECORDHEADSIZE) + QUEUEHEADSIZE,
+		memcpy((char*)lpMapAddress + recordNum * (recordSize + RECORDHEADSIZE) + QUEUEHEADSIZE,
 			pType,
 			typeSize
 		);
@@ -152,19 +167,25 @@ extern "C" { CreateQ(LPCTSTR  lpFileName,
 	{
 		pDqHead->typesize = 0;
 	}
-	ZeroMemory((BYTE*)lpMapAddress + QUEUEHEADSIZE, recordNum * (recordSize + RECORDHEADSIZE));	//初始化数据区
+	//ZeroMemory((BYTE*)lpMapAddress + QUEUEHEADSIZE, recordNum * (recordSize + RECORDHEADSIZE));	//初始化数据区
+	memset((char*)lpMapAddress + QUEUEHEADSIZE, 0, recordNum * (recordSize + RECORDHEADSIZE));
 	RECORD_HEAD* pRecordHead;
 	for (int i = 0; i < recordNum; i++)
 	{
-		pRecordHead = (RECORD_HEAD*)((BYTE*)lpMapAddress + QUEUEHEADSIZE + i * (recordSize + RECORDHEADSIZE));
+		pRecordHead = (RECORD_HEAD*)((char*)lpMapAddress + QUEUEHEADSIZE + i * (recordSize + RECORDHEADSIZE));
 		pRecordHead->ack = 0;
 		pRecordHead->index = i;
 	}
 
-	UnmapViewOfFile(lpMapAddress);
-	CloseHandle(hMapFile);
-	CloseHandle(hFile);
+	// 5. 同步数据到磁盘（可选）
+	if (msync(lpMapAddress, fileSize, MS_SYNC) == -1) {
+		std::cerr << "同步到磁盘失败: " << strerror(errno) << std::endl;
+	}
 
-	return TRUE;
+	// 6. 解除映射并关闭文件
+	munmap(lpMapAddress, fileSize);
+	close(fd);
+
+	return true;
 }
 }

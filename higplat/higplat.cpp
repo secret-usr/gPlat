@@ -29,7 +29,7 @@ buffer to save time
 
 Returns:  void
 F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
-inline void gettime(char * timebuf)
+inline void gettime(char* timebuf)
 {
 	struct tm* now;
 	time_t ltime;
@@ -773,4 +773,166 @@ extern "C" bool PopJustRecordFromQueue(const char* lpDqName)
 	pthread_mutex_unlock(&hMutex);
 	errorCode = 0;
 	return false;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: MulReadQ
+
+Summary:  Read multiple records from queue.
+
+Args:     LPCTSTR  lpDqName
+VOID  *lpRecord
+pointer of record buffer
+int start
+start position
+int * count
+actual read count
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool MulReadQ(const char* lpDqName, void* lpRecord, int start, int* count, int* pRecordSize)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDqName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+
+	QUEUE_HEAD* pDqHead;
+	pDqHead = (QUEUE_HEAD*)lpMapAddress;
+	int num, size;
+	num = pDqHead->num;
+	size = pDqHead->size;
+	if (pRecordSize != 0)
+	{
+		*pRecordSize = size;
+	}
+	if (start > (num - 1))
+	{
+		errorCode = ERROR_STARTPOSITION;
+		return false;
+	}
+	int readCount;
+	if (pDqHead->operateMode == NORMAL_MODE)
+	{
+		readCount = (num < *count) ? num : *count;
+		*count = readCount;
+		for (int i = 0; i < readCount; i++)
+		{
+			memcpy((char*)lpRecord + i * (size + RECORDHEADSIZE),
+				(char*)lpMapAddress + ((start + i) % num) * (size + RECORDHEADSIZE) + QUEUEHEADSIZE,
+				size + RECORDHEADSIZE);
+		}
+		return true;
+	}
+	else	// SHIFT_MODE
+	{
+		readCount = ((num - start) < *count) ? (num - start) : *count;
+		*count = readCount;
+		int actstart;
+		actstart = (pDqHead->writePoint + num - start) % num;
+		for (int i = 0; i < readCount; i++)
+		{
+			memcpy((char*)lpRecord + i * (size + RECORDHEADSIZE),
+				(char*)lpMapAddress + ((actstart + num - i) % num) * (size + RECORDHEADSIZE) + QUEUEHEADSIZE,
+				size + RECORDHEADSIZE);
+		}
+		return true;
+	}
+}
+
+extern "C" bool MulReadQ2(const char* lpDqName, void** lppRecords, int start, int* count, int* pRecordSize)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDqName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+
+	QUEUE_HEAD* pDqHead;
+	pDqHead = (QUEUE_HEAD*)lpMapAddress;
+	int num, size;
+	num = pDqHead->num;
+	size = pDqHead->size;
+	if (pRecordSize != 0)
+	{
+		*pRecordSize = size;
+	}
+	if (start > (num - 1))
+	{
+		errorCode = ERROR_STARTPOSITION;
+		*lppRecords = 0;
+		*count = 0;
+		*pRecordSize = 0;
+		return false;
+	}
+	int memsize;
+	void* pBuff;
+	int readCount;
+	//WaitForSingleObject(hMutex, INFINITE);
+	pthread_mutex_lock(&hMutex);
+	if (pDqHead->operateMode == NORMAL_MODE)
+	{
+		readCount = (num < *count) ? num : *count;
+		*count = readCount;
+
+		memsize = readCount * (size + RECORDHEADSIZE);
+		pBuff = malloc(memsize);
+		if (pBuff == NULL)
+		{
+			*lppRecords = 0;
+			*count = 0;
+			//ReleaseMutex(hMutex);
+			pthread_mutex_unlock(&hMutex);
+			return false;
+		}
+		for (int i = 0; i < readCount; i++)
+		{
+			memcpy((char*)pBuff + i * (size + RECORDHEADSIZE),
+				(char*)lpMapAddress + ((start + i) % num) * (size + RECORDHEADSIZE) + QUEUEHEADSIZE,
+				size + RECORDHEADSIZE);
+		}
+		//ReleaseMutex(hMutex);
+		pthread_mutex_unlock(&hMutex);
+		*lppRecords = pBuff;
+		return true;
+	}
+	else	// SHIFT_MODE
+	{
+		readCount = ((num - start) < *count) ? (num - start) : *count;
+		*count = readCount;
+
+		memsize = readCount * (size + RECORDHEADSIZE);
+		pBuff = malloc(memsize);
+		if (pBuff == NULL)
+		{
+			*lppRecords = 0;
+			*count = 0;
+			//ReleaseMutex(hMutex);
+			pthread_mutex_unlock(&hMutex);
+			return false;
+		}
+		int actstart;
+		actstart = (pDqHead->writePoint + num - start) % num;
+		for (int i = 0; i < readCount; i++)
+		{
+			memcpy((char*)pBuff + i * (size + RECORDHEADSIZE),
+				(char*)lpMapAddress + ((actstart + num - i) % num) * (size + RECORDHEADSIZE) + QUEUEHEADSIZE,
+				size + RECORDHEADSIZE);
+		}
+		//ReleaseMutex(hMutex);
+		pthread_mutex_unlock(&hMutex);
+		*lppRecords = pBuff;
+		return true;
+	}
 }

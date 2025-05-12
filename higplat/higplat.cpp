@@ -611,8 +611,166 @@ extern "C" bool FlushQFile(void)
 	{
 		if (strcmp(table[i].dqname, "\0") && !table[i].erased && table[i].lpMapAddress != NULL)
 		{
-			msync(table[i].lpMapAddress, table[i].filesize, MS_SYNC);
+			if (msync(table[i].lpMapAddress, table[i].filesize, MS_SYNC) == -1)
+			{
+				std::cerr << table[i].dqname << " msync failed: " << strerror(errno) << std::endl;
+			}
 		}
 	}
 	return true;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: ReadHead
+
+Summary:  Read queue head.
+
+Args:     LPCTSTR  lpDqName
+VOID  *lpHead
+pointer of head buffer
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool ReadHead(const char* lpDqName, void* lpHead)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDqName, tabmsg))
+	{
+		return false;
+	}
+
+	// 根据映射内存地址、互斥量对象句柄从数据队列取出队列头。
+	//WaitForSingleObject(tabmsg.hMutex, INFINITE);
+	pthread_mutex_lock(&tabmsg.hMutex);
+	memcpy(lpHead, tabmsg.lpMapAddress, QUEUEHEADSIZE);
+	//ReleaseMutex(tabmsg.hMutex);
+	pthread_mutex_unlock(&tabmsg.hMutex);
+	return true;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: ReadQ
+
+Summary:  Read a record from queue.
+
+Args:     LPCTSTR  lpDqName
+VOID  *lpRecord
+pointer of record buffer
+int actSize
+size of record
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool ReadQ(const char* lpDqName, void* lpRecord, int actSize, char* remoteIp)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDqName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	QUEUE_HEAD* pDqHead;
+	pDqHead = (QUEUE_HEAD*)lpMapAddress;
+	int num, size;
+	num = pDqHead->num;
+	size = pDqHead->size;
+
+	// 验证记录长度是否相符。
+	if (((pDqHead->dataType == ASCII_TYPE) && (actSize < size))
+		|| ((pDqHead->dataType == BINARY_TYPE) && (actSize != size)))
+	{
+		errorCode = ERROR_RECORDSIZE;
+		return false;
+	}
+
+	// 根据映射内存地址、互斥量对象句柄从数据队列取出一条记录。
+	//WaitForSingleObject(hMutex, INFINITE);
+	pthread_mutex_lock(&hMutex);
+	if (pDqHead->operateMode == NORMAL_MODE)
+	{
+		if (pDqHead->readPoint != pDqHead->writePoint)
+		{
+			pDqHead->readPoint = (pDqHead->readPoint + 1) % num;
+
+			RECORD_HEAD* pRecordHead = (RECORD_HEAD*)((char*)lpMapAddress + (pDqHead->readPoint) * (size + RECORDHEADSIZE) + QUEUEHEADSIZE);
+			if (remoteIp != 0)
+			{
+				strcpy(remoteIp, pRecordHead->remoteIp);
+			}
+
+			memcpy(lpRecord, (char*)pRecordHead + RECORDHEADSIZE, size);
+			//ReleaseMutex(hMutex);
+			pthread_mutex_unlock(&hMutex);
+			return true;
+		}
+	}
+	else
+	{
+		if (pDqHead->readPoint != 0)
+		{
+			RECORD_HEAD* pRecordHead = (RECORD_HEAD*)((char*)lpMapAddress + (pDqHead->writePoint) * (size + RECORDHEADSIZE) + QUEUEHEADSIZE);
+			if (remoteIp != 0)
+			{
+				strcpy(remoteIp, pRecordHead->remoteIp);
+			}
+
+			memcpy(lpRecord, (char*)pRecordHead + RECORDHEADSIZE, size);
+			//ReleaseMutex(hMutex);
+			pthread_mutex_unlock(&hMutex);
+			return true;
+		}
+	}
+
+	//ReleaseMutex(hMutex);
+	pthread_mutex_unlock(&hMutex);
+	errorCode = ERROR_DQ_EMPTY;
+	return false;
+}
+
+//从队列中删除一条记录（读指针加1），不返回数据
+extern "C" bool PopJustRecordFromQueue(const char* lpDqName)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDqName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	QUEUE_HEAD* pDqHead;
+	pDqHead = (QUEUE_HEAD*)lpMapAddress;
+	int num = pDqHead->num;
+
+	// 根据映射内存地址、互斥量对象句柄从数据队列弹出一条记录。
+	//WaitForSingleObject(hMutex, INFINITE);
+	pthread_mutex_lock(&hMutex);
+	if (pDqHead->operateMode == NORMAL_MODE)
+	{
+		if (pDqHead->readPoint != pDqHead->writePoint)
+		{
+			pDqHead->readPoint = (pDqHead->readPoint + 1) % num;
+			//ReleaseMutex(hMutex);
+			pthread_mutex_unlock(&hMutex);
+			return true;
+		}
+		else
+		{
+			//ReleaseMutex(hMutex);
+			pthread_mutex_unlock(&hMutex);
+			errorCode = ERROR_DQ_EMPTY;
+			return false;
+		}
+	}
+	//ReleaseMutex(hMutex);
+	pthread_mutex_unlock(&hMutex);
+	errorCode = 0;
+	return false;
 }

@@ -97,7 +97,7 @@ struct TABLE_MSG
 	int  hFile;
 	void* lpMapAddress;
 	int hMapFile;
-	std::mutex hMutex;
+	pthread_mutex_t hMutex;
 	std::mutex * pmutex_rw;
 	bool erased;
 	int count;

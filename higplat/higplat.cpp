@@ -17,6 +17,7 @@ char dataQuePath[100];
 struct TABLE_MSG table[TABLESIZE];
 int tabCounter = 0;
 std::mutex mutex_rw;
+int usereason = 0;
 
 /*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
 Function: gettime
@@ -106,7 +107,6 @@ bool inserttab(const struct TABLE_MSG& tabmsg)
 	}
 }
 
-
 /*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
 Function: fetchtab
 
@@ -149,7 +149,6 @@ bool fetchtab(const char* dqname, struct TABLE_MSG& tabmsg)
 	//ReleaseMutex(hTabMutex);
 	return true;
 }
-
 
 /*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
 Function: fetchtab1
@@ -196,7 +195,6 @@ bool fetchtab1(const char* dqname, struct TABLE_MSG& tabmsg)
 	//ReleaseMutex(hTabMutex);
 	return true;
 }
-
 
 /*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
 Function: deletetab
@@ -248,7 +246,6 @@ bool deletetab(const char* dqname, struct TABLE_MSG& tabmsg)
 	//ReleaseMutex(hTabMutex);
 	return false;
 }
-
 
 /*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
 Function: hash1, hash2
@@ -446,6 +443,8 @@ Returns:  bool
 F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
 extern "C" bool LoadQ(const char* lpDqName)
 {
+	usereason = 1;
+
 	//这里就不锁定了，因为LoadQ肯定在单线程上运行，和OpenQ不一样，另外下面的是fetchtab，函数里也要锁定的，这样会死锁的
 	//std::unique_lock<std::mutex> lock(mutex_rw);
 
@@ -514,6 +513,7 @@ extern "C" bool LoadQ(const char* lpDqName)
 	tabmsg.lpMapAddress = lpMapAddress;   //为将内存文件映射数据定期写回文件而增加
 	//tabmsg.hMutex = hMutex;
 	pthread_mutex_init(&tabmsg.hMutex, NULL);
+	tabmsg.filesize = file_size;		  //linux下新增
 	if (inserttab(tabmsg))
 	{
 		return true;
@@ -522,4 +522,97 @@ extern "C" bool LoadQ(const char* lpDqName)
 	close(fd);
 	pthread_mutex_destroy(&tabmsg.hMutex);
 	return false;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: UnloadQ
+
+Summary:  Close mutex, file-mapping object and file.
+
+Args:     LPCTSTR  lpDqName
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool UnloadQ(const char* lpDqName)
+{
+	//从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (deletetab(lpDqName, tabmsg))
+	{
+		//关闭映射文件对象句柄、互斥量对象句柄、文件句柄。
+		//CloseHandle(tabmsg.hMapFile);
+		close(tabmsg.hFile);
+		pthread_mutex_destroy(&tabmsg.hMutex);
+
+		//关闭读写锁
+		if (tabmsg.pmutex_rw != nullptr)
+		{
+			tabmsg.pmutex_rw->~mutex();
+			tabmsg.pmutex_rw = nullptr;
+		}
+
+		if (*(int*)tabmsg.lpMapAddress == BOARD_T)
+		{
+			BOARD_HEAD* pHead = (BOARD_HEAD*)tabmsg.lpMapAddress;
+			for (int i = 0; i < MUTEXSIZE; i++)
+			{
+				pHead->mutex_rw_tag[i].~mutex();
+			}
+		}
+	}
+	return true;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: UnloadQ
+
+Summary:  Unload all queue and bulletin loaded by this process.
+
+Args:
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool UnloadAll(void)
+{
+	for (int i = 0; i < TABLESIZE; i++)
+	{
+		if (strcmp(table[i].dqname, "\0") && !table[i].erased)
+		{
+			//CloseHandle(table[i].hMapFile);
+			close(table[i].hFile);
+			pthread_mutex_destroy(&table[i].hMutex);
+			strcpy(table[i].dqname, "\0");
+
+			//关闭读写锁
+			if (table[i].pmutex_rw != nullptr)
+			{
+				table[i].pmutex_rw->~mutex();
+				table[i].pmutex_rw = nullptr;
+			}
+		}
+	}
+	return true;
+}
+
+
+//为将内存文件映射数据定期写回文件而增加
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: FlushQFile
+
+Summary:  将内存文件映射数据写回文件.
+
+Args:
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool FlushQFile(void)
+{
+	for (int i = 0; i < TABLESIZE; i++)
+	{
+		if (strcmp(table[i].dqname, "\0") && !table[i].erased && table[i].lpMapAddress != NULL)
+		{
+			msync(table[i].lpMapAddress, table[i].filesize, MS_SYNC);
+		}
+	}
+	return true;
 }

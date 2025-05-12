@@ -101,6 +101,7 @@ struct TABLE_MSG
 	std::mutex * pmutex_rw;
 	bool erased;
 	int count;
+	long filesize;	// 文件大小 linux平台新增
 };
 
 struct QUEUE_HEAD

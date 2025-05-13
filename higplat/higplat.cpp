@@ -287,7 +287,7 @@ Function: IsEmptyQ
 
 Summary:  Get error code.
 
-Args:     VOID
+Args:     void
 
 Returns:  BOOL
 F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
@@ -301,7 +301,7 @@ Function: CreateQ
 
 Summary:  Create queue file according the specified size and tye.
 
-Args:     LPCTSTR  lpFileName
+Args:     const char*  lpFileName
 queue/file name
 int recordSize
 record size
@@ -424,7 +424,7 @@ extern "C" bool CreateQ(const char* lpFileName,
 	{
 		pDqHead->typesize = 0;
 	}
-	//ZeroMemory((BYTE*)lpMapAddress + QUEUEHEADSIZE, recordNum * (recordSize + RECORDHEADSIZE));	//初始化数据区
+	//ZeroMemory((char*)lpMapAddress + QUEUEHEADSIZE, recordNum * (recordSize + RECORDHEADSIZE));	//初始化数据区
 	memset((char*)lpMapAddress + QUEUEHEADSIZE, 0, recordNum * (recordSize + RECORDHEADSIZE));
 	RECORD_HEAD* pRecordHead;
 	for (int i = 0; i < recordNum; i++)
@@ -451,7 +451,7 @@ Function: LoadQ
 
 Summary:  Close mutex, file-mapping object and file.
 
-Args:     LPCTSTR  lpDqName
+Args:     const char*  lpDqName
 
 Returns:  bool
 F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
@@ -543,7 +543,7 @@ Function: UnloadQ
 
 Summary:  Close mutex, file-mapping object and file.
 
-Args:     LPCTSTR  lpDqName
+Args:     const char*  lpDqName
 
 Returns:  BOOL
 F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
@@ -639,8 +639,8 @@ Function: ReadHead
 
 Summary:  Read queue head.
 
-Args:     LPCTSTR  lpDqName
-VOID  *lpHead
+Args:     const char*  lpDqName
+void  *lpHead
 pointer of head buffer
 
 Returns:  BOOL
@@ -668,8 +668,8 @@ Function: ReadQ
 
 Summary:  Read a record from queue.
 
-Args:     LPCTSTR  lpDqName
-VOID  *lpRecord
+Args:     const char*  lpDqName
+void  *lpRecord
 pointer of record buffer
 int actSize
 size of record
@@ -794,8 +794,8 @@ Function: MulReadQ
 
 Summary:  Read multiple records from queue.
 
-Args:     LPCTSTR  lpDqName
-VOID  *lpRecord
+Args:     const char*  lpDqName
+void  *lpRecord
 pointer of record buffer
 int start
 start position
@@ -956,8 +956,8 @@ Function: WriteQ
 
 Summary:  Write a record to queue.
 
-Args:     LPCTSTR  lpDqName
-VOID  *lpRecord
+Args:     const char*  lpDqName
+void  *lpRecord
 pointer of record buffer
 int actSize
 size of record
@@ -1038,7 +1038,7 @@ Function: ClearQ
 
 Summary:  Clear queue.
 
-Args:     LPCTSTR  lpDqName
+Args:     const char*  lpDqName
 
 Returns:  BOOL
 F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
@@ -1078,7 +1078,7 @@ Function: SetPtrQ
 
 Summary:  Set read and write pointer of queue.
 
-Args:     LPCTSTR  lpDqName, int readPtr, int writePtr
+Args:     const char*  lpDqName, int readPtr, int writePtr
 
 Returns:  BOOL
 F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
@@ -1139,8 +1139,8 @@ Function: PeekQ
 
 Summary:  Read a record but not remove it from queue.
 
-Args:     LPCTSTR  lpDqName
-VOID  *lpRecord
+Args:     const char*  lpDqName
+void  *lpRecord
 pointer of record buffer
 int actSize
 size of record
@@ -1203,7 +1203,7 @@ Function: IsEmptyQ
 
 Summary:  Judge whether queue is empty.
 
-Args:     LPCTSTR  lpDqName
+Args:     const char*  lpDqName
 
 Returns:  BOOL
 F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
@@ -1254,7 +1254,7 @@ Function: IsFullQ
 
 Summary:  Judge whether queue is full.
 
-Args:     LPCTSTR  lpDqName
+Args:     const char*  lpDqName
 
 Returns:  BOOL
 F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
@@ -1303,7 +1303,7 @@ Function: CreateB
 
 Summary:  Create bulletin file according the specified size.
 
-Args:     LPCTSTR  lpFileName
+Args:     const char*  lpFileName
 bulletin/file name
 int size
 bulletin data size, the file size includes bulletin data size
@@ -1412,3 +1412,1240 @@ extern "C" bool CreateB(const char* lpFileName, int size)
 
 	return true;
 }
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: ReadInfoB
+
+Summary:  Read bulletin information.
+
+Args:     const char* lpBulletinName
+bulletin name
+BOARD_HEAD * pHead
+pointer of head buffer
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool ReadInfoB(const char* lpBulletinName,
+	int* pTotalSize,
+	int* pDataSize,
+	int* pLeftSize,
+	int* pItemNum,
+	int* buffSize,
+	char ppBuff[][24])
+{
+	// Search bulletin in hash table.
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpBulletinName, tabmsg))
+	{
+		return false;
+	}
+
+	BOARD_HEAD* pHead;
+	pHead = (BOARD_HEAD*)tabmsg.lpMapAddress;
+
+	// 根据映射内存地址、互斥量对象句柄从公告板取出公告板头。
+	//WaitForSingleObject(tabmsg.hMutex, INFINITE);
+	std::lock_guard<std::mutex> lock(*tabmsg.pmutex_rw);
+	if (pTotalSize != 0)
+	{
+		*pTotalSize = pHead->totalsize;
+	}
+	if (pDataSize != 0)
+	{
+		*pDataSize = pHead->totalsize - sizeof(BOARD_HEAD);
+	}
+	if (pLeftSize != 0)
+	{
+		*pLeftSize = pHead->remain;
+	}
+	if (pItemNum != 0)
+	{
+		*pItemNum = pHead->indexcount;
+	}
+
+	if (buffSize != 0)
+	{
+		if (pHead->indexcount > *buffSize)
+		{
+			*buffSize = 0;
+		}
+		else if (ppBuff != NULL)
+		{
+			*buffSize = pHead->indexcount;
+			int index = 0;
+			for (int i = 0; i < INDEXSIZE; i++)
+			{
+				//				if (index>=pHead->indexcount) break;
+				if (pHead->index[i].itemname[0] != '\0' && pHead->index[i].erased == false)
+				{
+					strcpy(ppBuff[index], pHead->index[i].itemname);
+					index++;
+				}
+			}
+			if (index != pHead->indexcount)
+				return false;
+		}
+	}
+
+	//ReleaseMutex(tabmsg.hMutex);
+	return true;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: ReadB
+
+Summary:  Read the specified item from bulletin.
+
+Args:     const char* lpBulletinName
+bulletin name
+const char* lpItemName
+item name to be read
+void  *lpItem
+item buffer pointer
+int actSize
+item size
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool ReadB(const char* lpBulletinName, const char* lpItemName, void* lpItem, int actSize, timespec* timestamp)
+{
+	// Search bulletin in hash table.
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpBulletinName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	BOARD_HEAD* pHead;
+	BOARD_INDEX_STRUCT* pIndex;
+	pHead = (BOARD_HEAD*)lpMapAddress;
+	pIndex = pHead->index;
+
+	// search item in bulletin's index(hash table)
+	int loc, c;
+	loc = hash1(lpItemName);
+	c = hash2(lpItemName);
+
+	//std::lock_guard<std::mutex> lock(*tabmsg.pmutex_rw);
+	tabmsg.pmutex_rw->lock();
+
+	while (strcmp(pIndex[loc].itemname, "\0") && strcmp(pIndex[loc].itemname, lpItemName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (!strcmp(pIndex[loc].itemname, "\0") || pIndex[loc].erased)
+	{
+		// item not found
+		errorCode = ERROR_RECORD_NOT_EXIST;
+		tabmsg.pmutex_rw->unlock();
+		return false;
+	}
+
+	// validate item size
+	if (pIndex[loc].itemsize != actSize)
+	{
+		errorCode = ERROR_RECORDSIZE;
+		tabmsg.pmutex_rw->unlock();
+		return false;
+	}
+
+	tabmsg.pmutex_rw->unlock();
+
+	std::lock_guard<std::mutex> lock(pHead->mutex_rw_tag[loc & (MUTEXSIZE - 1)]);
+
+	memcpy(lpItem, (char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, actSize);
+	if (timestamp != 0)
+	{
+		*timestamp = pIndex[loc].timestamp;
+	}
+
+	return true;
+}
+
+extern "C" bool ReadB_String(const char* lpBulletinName, const char* lpItemName, void* lpItem, int actSize, timespec* timestamp)
+{
+	// Search bulletin in hash table.
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpBulletinName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	BOARD_HEAD* pHead;
+	BOARD_INDEX_STRUCT* pIndex;
+	pHead = (BOARD_HEAD*)lpMapAddress;
+	pIndex = pHead->index;
+
+	// search item in bulletin's index(hash table)
+	int loc, c;
+	loc = hash1(lpItemName);
+	c = hash2(lpItemName);
+
+	//std::lock_guard<std::mutex> lock(*tabmsg.pmutex_rw);
+	tabmsg.pmutex_rw->lock();
+
+	while (strcmp(pIndex[loc].itemname, "\0") && strcmp(pIndex[loc].itemname, lpItemName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (!strcmp(pIndex[loc].itemname, "\0") || pIndex[loc].erased)
+	{
+		// item not found
+		errorCode = ERROR_RECORD_NOT_EXIST;
+		tabmsg.pmutex_rw->unlock();
+		return false;
+	}
+
+	// validate item size
+	if (pIndex[loc].itemsize > actSize)
+	{
+		errorCode = BUFFER_TOO_SMALL;
+		tabmsg.pmutex_rw->unlock();
+		return false;
+	}
+
+	tabmsg.pmutex_rw->unlock();
+
+	std::lock_guard<std::mutex> lock(pHead->mutex_rw_tag[loc & (MUTEXSIZE - 1)]);
+
+	//ZeroMemory(lpItem, actSize);
+	memset(lpItem, 0, actSize);
+	memcpy(lpItem, (char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, pIndex[loc].itemsize);
+	if (timestamp != 0)
+	{
+		*timestamp = pIndex[loc].timestamp;
+	}
+
+	return true;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: WriteB
+
+Summary:  Write the specified item into bulletin.
+
+Args:     const char* lpBulletinName
+bulletin name
+const char* lpItemName
+item name to be writen
+void  *lpItem
+item buffer pointer
+int actSize
+item size
+int offset
+item offset
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool WriteB(const char* lpBulletinName, const char* lpItemName, void* lpItem, int actSize, void* lpSubItem, int actSubSize)
+{
+	// Search bulletin in hash table.
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpBulletinName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	BOARD_HEAD* pHead;
+	BOARD_INDEX_STRUCT* pIndex;
+	pHead = (BOARD_HEAD*)lpMapAddress;
+	pIndex = pHead->index;
+
+	// search item in bulletin's index(hash table)
+	int loc, c;
+	loc = hash1(lpItemName);
+	c = hash2(lpItemName);
+
+	////std::unique_lock<std::mutex> lock(*tabmsg.pmutex_rw);
+	tabmsg.pmutex_rw->lock();
+
+	while (strcmp(pIndex[loc].itemname, "\0") && strcmp(pIndex[loc].itemname, lpItemName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (!strcmp(pIndex[loc].itemname, "\0") || pIndex[loc].erased)
+	{
+		// item not found
+		errorCode = ERROR_RECORD_NOT_EXIST;
+		tabmsg.pmutex_rw->unlock();
+		return false;
+
+		// 不再自动创建
+		// item not found,create it
+		/*
+		// no enough remained space
+		if (pHead->remain < actSize)
+		{
+			errorCode = ERROR_NO_SPACE;	//mark
+			tabmsg.pmutex_rw->unlock();
+			return false;
+		}
+
+		// index is full
+		if (pHead->indexcount == INDEXSIZE - 1)
+		{
+			errorCode = ERROR_TABLE_OVERFLOW;
+			tabmsg.pmutex_rw->unlock();
+			return false;
+		}
+
+		tabmsg.pmutex_rw->unlock();
+
+		//创建前需锁定后重新搜索可用地址mark
+		tabmsg.pmutex_rw->lock();
+
+		int loc, c;
+		loc = hash1(lpItemName);
+		c = hash2(lpItemName);
+		while (strcmp(pIndex[loc].itemname, "\0") && pIndex[loc].erased == false)
+		{
+			loc = (loc + c) % INDEXSIZE;
+		}
+
+		// create item index
+		pHead->indexcount++;
+		strcpy(pIndex[loc].itemname, lpItemName);
+		pIndex[loc].itemsize = actSize;
+		pIndex[loc].startpos = pHead->nextpos;
+		pIndex[loc].erased = false;	//mark
+		pHead->nextpos += actSize;
+		pHead->remain -= actSize;
+
+		tabmsg.pmutex_rw->unlock();
+		*/
+	}
+	else
+	{
+		tabmsg.pmutex_rw->unlock();
+	}
+
+	std::unique_lock<std::mutex> lock(pHead->mutex_rw_tag[loc & (MUTEXSIZE - 1)]);
+
+	if (lpSubItem == 0)
+	{
+		// validate item size
+		if (pIndex[loc].itemsize != actSize)
+		{
+			errorCode = ERROR_RECORDSIZE;
+			return false;
+		}
+		memcpy((char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, lpItem, actSize);
+		//_time64(&pIndex[loc].timestamp);
+		clock_gettime(CLOCK_REALTIME, &pIndex[loc].timestamp);
+	}
+	else
+	{
+		// validate item size
+		if (pIndex[loc].itemsize != actSize || (char*)lpSubItem - (char*)lpItem + actSubSize > actSize)
+		{
+			errorCode = ERROR_RECORDSIZE;
+			return false;
+		}
+		memcpy((char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos + ((char*)lpSubItem - (char*)lpItem), lpSubItem, actSubSize);
+		//_time64(&pIndex[loc].timestamp);
+		clock_gettime(CLOCK_REALTIME, &pIndex[loc].timestamp);
+	}
+	//pHead->counter++;	//mark 如果打开，意味着tabmsg.pmutex_rw要一直写锁定或再次写锁定，意义不大
+	return true;
+}
+
+extern "C" bool WriteB_String(const char* lpBulletinName, const char* lpItemName, void* lpItem, int actSize, void* lpSubItem, int actSubSize)
+{
+	// Search bulletin in hash table.
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpBulletinName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	BOARD_HEAD* pHead;
+	BOARD_INDEX_STRUCT* pIndex;
+	pHead = (BOARD_HEAD*)lpMapAddress;
+	pIndex = pHead->index;
+
+	// search item in bulletin's index(hash table)
+	int loc, c;
+	loc = hash1(lpItemName);
+	c = hash2(lpItemName);
+
+	//std::unique_lock<std::mutex> lock(*tabmsg.pmutex_rw);
+	tabmsg.pmutex_rw->lock();
+
+	while (strcmp(pIndex[loc].itemname, "\0") && strcmp(pIndex[loc].itemname, lpItemName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (!strcmp(pIndex[loc].itemname, "\0") || pIndex[loc].erased)	// item not found,create it
+	{
+		// item not found
+		errorCode = ERROR_RECORD_NOT_EXIST;
+		tabmsg.pmutex_rw->unlock();
+		return false;
+	}
+	else
+	{
+		tabmsg.pmutex_rw->unlock();
+	}
+
+	std::unique_lock<std::mutex> lock(pHead->mutex_rw_tag[loc & (MUTEXSIZE - 1)]);
+
+	if (lpSubItem == 0)
+	{
+		// validate item size
+		if (pIndex[loc].itemsize < actSize)
+		{
+			errorCode = STRING_TOO_LONG;
+			return false;
+		}
+		//ZeroMemory((char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, pIndex[loc].itemsize);
+		memset((char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, 0, pIndex[loc].itemsize);
+		memcpy((char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, lpItem, actSize);
+		//_time64(&pIndex[loc].timestamp);
+		clock_gettime(CLOCK_REALTIME, &pIndex[loc].timestamp);
+	}
+	else
+	{
+		//不支持
+		return false;
+	}
+	//pHead->counter++;	//mark 如果打开，意味着tabmsg.pmutex_rw要一直写锁定或再次写锁定，意义不大
+	return true;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: WriteBOffSet
+
+Summary:  Write the specified item into bulletin.
+
+Args:     const char* lpBulletinName
+bulletin name
+const char* lpItemName
+item name to be writen
+void  *lpItem
+item buffer pointer
+int actSize
+item size
+int offset
+item offset
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool WriteBOffSet(const char* lpBulletinName, const char* lpItemName, void* lpItem, int actSize, int offSet, int actSubSize)
+{
+	return WriteB(lpBulletinName, lpItemName, lpItem, actSize, (char*)lpItem + offSet, actSubSize);
+}
+
+extern "C" bool ClearB(const char* lpBoardName)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpBoardName, tabmsg))
+	{
+		return false;
+	}
+
+	void* lpMapAddress;
+	lpMapAddress = tabmsg.lpMapAddress;
+	BOARD_HEAD* pHead;
+	pHead = (BOARD_HEAD*)lpMapAddress;
+
+	if (pHead->qbdtype != BOARD_T) return false;
+
+	std::unique_lock<std::mutex> lock(*tabmsg.pmutex_rw);
+
+	int totalsize = pHead->totalsize;
+	int typesize = pHead->typesize;
+	int fileSize = pHead->totalsize + pHead->typesize;
+	//ZeroMemory((char*)pHead->index, sizeof(pHead->index));
+	memset((char*)pHead->index, 0, sizeof(pHead->index));
+	pHead->qbdtype = BOARD_T;
+	pHead->totalsize = totalsize;	// BOARD_HEAD和后面数据区大小的和，不包括最后面的类型区
+	pHead->typesize = typesize;		// 最后面的类型区的大小 mark
+	pHead->remain = totalsize - sizeof(BOARD_HEAD);
+	pHead->typeremain = typesize;
+	pHead->counter = 0;
+	pHead->nextpos = 0;
+	pHead->nexttypepos = 0;
+	pHead->indexcount = 0;
+
+	return true;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: DeleteItem
+
+Summary:  Delete Item.
+
+Args:     const char* lpDBName
+database name
+const char* lpTableName
+table name
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool DeleteItem(const char* lpBoardName, const char* lpItemName)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpBoardName, tabmsg))
+	{
+		return false;
+	}
+
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	BOARD_HEAD* pHead;
+	BOARD_INDEX_STRUCT* pIndex;
+	pHead = (BOARD_HEAD*)lpMapAddress;
+	pIndex = pHead->index;
+
+	//WaitForSingleObject(hMutex, INFINITE);
+	std::unique_lock<std::mutex> lock(*tabmsg.pmutex_rw);
+
+	// search table in DB's index(hash table)
+	int loc, c;
+	loc = hash1(lpItemName);
+	c = hash2(lpItemName);
+	while (strcmp(pIndex[loc].itemname, "\0") && strcmp(pIndex[loc].itemname, lpItemName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (!strcmp(pIndex[loc].itemname, "\0") || pIndex[loc].erased)
+	{
+		// table not found
+		errorCode = ERROR_ITEM_NOT_EXIST;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	strcpy(pIndex[loc].itemname, "CT0D9GG_~$59");	 //不是必需的，只是确保安全
+	pIndex[loc].erased = true;
+	//pIndex[loc].typesize = 0; mark
+
+	int pos = pIndex[loc].startpos;
+	int itemsize = pIndex[loc].itemsize;
+
+	void* Destination = (char*)lpMapAddress + sizeof(BOARD_HEAD) + pos;
+	const void* Source = (char*)Destination + itemsize;
+	int Length = pHead->totalsize - sizeof(BOARD_HEAD) - pos - itemsize;
+	//memmove(Destination, Source, Length);
+	memmove(Destination, Source, Length);
+
+	//mark
+	int typepos = pIndex[loc].typeaddr;
+	int typesize = pIndex[loc].typesize;
+	pIndex[loc].typesize = 0;
+	Destination = (char*)lpMapAddress + pHead->totalsize + typepos;
+	Source = (char*)Destination + typesize;
+	Length = INDEXSIZE * TYPEAVGSIZE - typepos - typesize;
+	//memmove(Destination, Source, Length);
+	memmove(Destination, Source, Length);
+
+	for (int i = 0; i < INDEXSIZE; i++)
+	{
+		//if (strcmp(pIndex[i].itemname, "\0") && !pIndex[i].erased && pIndex[i].startpos > pos)
+		//{
+		//	pIndex[i].startpos -= itemsize;
+		//}
+
+		//mark
+		if (strcmp(pIndex[i].itemname, "\0") && !pIndex[i].erased)
+		{
+			if (pIndex[i].startpos > pos)
+				pIndex[i].startpos -= itemsize;
+
+			if (pIndex[i].typeaddr > typepos)
+				pIndex[i].typeaddr -= typesize;
+		}
+	}
+
+	pHead->nextpos -= itemsize;
+	pHead->remain += itemsize;
+	pHead->indexcount--;
+
+	//mark
+	pHead->nexttypepos -= typesize;
+	pHead->typeremain += typesize;
+
+	//ReleaseMutex(hMutex);
+	return true;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: CreateTable
+
+Summary:  Create table in DB.
+
+Args:     const char* lpDBName
+database name
+const char* lpItemName
+item name to be writen
+void  *lpItem
+item buffer pointer
+int actSize
+item size
+int offset
+item offset
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool CreateTable(const char* lpDBName, const char* lpTableName, int recordSize, int maxCount, void* pType, int typeSize)
+{
+	if (recordSize > MAXMSGLEN || typeSize > TYPEMAXSIZE)
+	{
+		errorCode = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+
+	// Search bulletin in hash table.
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDBName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	DB_HEAD* pHead;
+	DB_INDEX_STRUCT* pIndex;
+	pHead = (DB_HEAD*)lpMapAddress;
+	pIndex = pHead->index;
+
+	//WaitForSingleObject(hMutex, INFINITE);
+	std::unique_lock<std::mutex> lock(*tabmsg.pmutex_rw);
+
+	// search table in DB's index(hash table)
+	int loc, c, loc_s, c_s;
+	loc = hash1(lpTableName);
+	c = hash2(lpTableName);
+	loc_s = loc, c_s = c;
+	while (strcmp(pIndex[loc].tablename, "\0") && strcmp(pIndex[loc].tablename, lpTableName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (strcmp(pIndex[loc].tablename, lpTableName) == 0 && pIndex[loc].erased == false)
+	{
+		errorCode = ERROR_TABLE_ALREADY_EXIST;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	int totalsize;
+	totalsize = recordSize * maxCount;
+
+	// no enough remained space
+	if (pHead->remain < totalsize)
+	{
+		errorCode = ERROR_NO_SPACE;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	loc = loc_s;
+	c = c_s;
+	while (strcmp(pIndex[loc].tablename, "\0") && !pIndex[loc].erased)
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (pHead->indexcount == INDEXSIZE - 1)
+	{
+		errorCode = ERROR_TABLE_OVERFLOW;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	pHead->indexcount++;
+	strcpy(pIndex[loc].tablename, lpTableName);
+	pIndex[loc].recordsize = recordSize;
+	pIndex[loc].maxcount = maxCount;
+	pIndex[loc].currcount = 0;
+	pIndex[loc].startpos = pHead->nextpos;
+	pIndex[loc].erased = false;
+	pHead->nextpos += totalsize;
+	pHead->remain -= totalsize;
+	//_time64(&pIndex[loc].timestamp);
+	clock_gettime(CLOCK_REALTIME, &pIndex[loc].timestamp);
+	//if (pType != 0 && typeSize != 0 && typeSize < TYPEMAXSIZE)
+	if (pType != 0 && typeSize != 0 && typeSize < TYPEMAXSIZE && typeSize < pHead->typeremain)
+	{
+		//CopyMemory((char*)lpMapAddress + pHead->totalsize + loc * TYPEMAXSIZE,
+		//	pType,
+		//	typeSize
+		//);
+		//pIndex[loc].typesize = typeSize;
+
+		//mark
+		memcpy((char*)lpMapAddress + pHead->totalsize + pHead->nexttypepos,
+			pType,
+			typeSize
+		);
+		pIndex[loc].typesize = typeSize;
+		pIndex[loc].typeaddr = pHead->nexttypepos;
+		pHead->nexttypepos += typeSize;
+		pHead->typeremain -= typeSize;
+	}
+	else
+	{
+		pIndex[loc].typesize = 0;
+	}
+	//ReleaseMutex(hMutex);
+	return true;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: ReadHead
+
+Summary:  Read queue head.
+
+Args:     const char*  lpDqName
+void  *lpHeadstatic char   buffer[
+pointer of head buffer
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool ReadHeadDB(const char* lpDBName, void* lpHead)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDBName, tabmsg))
+	{
+		return false;
+	}
+
+	// 根据映射内存地址、互斥量对象句柄从数据队列取出队列头。
+	//WaitForSingleObject(tabmsg.hMutex, INFINITE);
+	std::lock_guard<std::mutex> lock(*tabmsg.pmutex_rw);
+	memcpy(lpHead, tabmsg.lpMapAddress, sizeof(DB_HEAD));
+	//ReleaseMutex(tabmsg.hMutex);
+	return true;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: ClearTable
+
+Summary:  Clear table.
+
+Args:     const char* lpDBName
+database name
+const char* lpTableName
+table name
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool ClearTable(const char* lpDBName, const char* lpTableName)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDBName, tabmsg))
+	{
+		return false;
+	}
+
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	DB_HEAD* pHead;
+	DB_INDEX_STRUCT* pIndex;
+	pHead = (DB_HEAD*)lpMapAddress;
+	pIndex = pHead->index;
+
+	//WaitForSingleObject(hMutex, INFINITE);
+	std::unique_lock<std::mutex> lock(*tabmsg.pmutex_rw);
+
+	// search table in bulletin's index(hash table)
+	int loc, c;
+	loc = hash1(lpTableName);
+	c = hash2(lpTableName);
+	while (strcmp(pIndex[loc].tablename, "\0") && strcmp(pIndex[loc].tablename, lpTableName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (!strcmp(pIndex[loc].tablename, "\0") || pIndex[loc].erased)
+	{
+		// table not found
+		errorCode = ERROR_TABLE_NOT_EXIST;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	// clear table
+	pIndex[loc].currcount = 0;
+	//_time64(&pIndex[loc].timestamp);
+	clock_gettime(CLOCK_REALTIME, &pIndex[loc].timestamp);
+
+	pHead->counter++;
+	//ReleaseMutex(hMutex);
+	return true;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: UpdateTable
+
+Summary:  Update Table.
+
+Args:     const char* lpDBName
+database name
+const char* lpTableName
+table name
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool UpdateTable(const char* lpDBName, const char* lpTableName, int rowid, int recordSize, void* lpRecord)
+{
+	if (rowid < 0 || recordSize == 0) return true;
+
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDBName, tabmsg))
+	{
+		return false;
+	}
+
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	DB_HEAD* pHead;
+	DB_INDEX_STRUCT* pIndex;
+	pHead = (DB_HEAD*)lpMapAddress;
+	pIndex = pHead->index;
+
+	//WaitForSingleObject(hMutex, INFINITE);
+	std::unique_lock<std::mutex> lock(*tabmsg.pmutex_rw);
+
+	// search table in DB's index(hash table)
+	int loc, c;
+	loc = hash1(lpTableName);
+	c = hash2(lpTableName);
+	while (strcmp(pIndex[loc].tablename, "\0") && strcmp(pIndex[loc].tablename, lpTableName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (!strcmp(pIndex[loc].tablename, "\0") || pIndex[loc].erased)
+	{
+		// table not found
+		errorCode = ERROR_TABLE_NOT_EXIST;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	if (recordSize != pIndex[loc].recordsize)
+	{
+		errorCode = ERROR_RECORDSIZE;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	if (!(rowid < pIndex[loc].currcount))
+	{
+		errorCode = ERROR_TABLE_ROWID;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	memcpy((char*)lpMapAddress + sizeof(DB_HEAD) + pIndex[loc].startpos + recordSize * rowid, lpRecord, recordSize);
+
+	pHead->counter++;
+	//ReleaseMutex(hMutex);
+	return true;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: InsertTable
+
+Summary:  Insert Table.
+
+Args:     const char* lpDBName
+database name
+const char* lpTableName
+table name
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool InsertTable(const char* lpDBName, const char* lpTableName, int count, int recordSize, void* lpRecords)
+{
+	if (count == 0 || recordSize == 0) return true;
+
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDBName, tabmsg))
+	{
+		return false;
+	}
+
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	DB_HEAD* pHead;
+	DB_INDEX_STRUCT* pIndex;
+	pHead = (DB_HEAD*)lpMapAddress;
+	pIndex = pHead->index;
+
+	//WaitForSingleObject(hMutex, INFINITE);
+	std::unique_lock<std::mutex> lock(*tabmsg.pmutex_rw);
+
+	// search table in DB's index(hash table)
+	int loc, c;
+	loc = hash1(lpTableName);
+	c = hash2(lpTableName);
+	while (strcmp(pIndex[loc].tablename, "\0") && strcmp(pIndex[loc].tablename, lpTableName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (!strcmp(pIndex[loc].tablename, "\0") || pIndex[loc].erased)
+	{
+		// table not found
+		errorCode = ERROR_TABLE_NOT_EXIST;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	if (recordSize != pIndex[loc].recordsize)
+	{
+		errorCode = ERROR_RECORDSIZE;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	if (pIndex[loc].currcount + count > pIndex[loc].maxcount)
+	{
+		errorCode = ERROR_NO_SPACE;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	memcpy((char*)lpMapAddress + sizeof(DB_HEAD) + pIndex[loc].startpos + recordSize * pIndex[loc].currcount, lpRecords, recordSize * count);
+	pIndex[loc].currcount += count;
+	//_time64(&pIndex[loc].timestamp);
+	clock_gettime(CLOCK_REALTIME, &pIndex[loc].timestamp);
+
+	pHead->counter++;
+	//ReleaseMutex(hMutex);
+	return true;
+}
+
+
+extern "C" bool RefreshTable(const char* lpDBName, const char* lpTableName, int count, int recordSize, void* lpRecords)
+{
+	if (count == 0 || recordSize == 0) return true;
+
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDBName, tabmsg))
+	{
+		return false;
+	}
+
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	DB_HEAD* pHead;
+	DB_INDEX_STRUCT* pIndex;
+	pHead = (DB_HEAD*)lpMapAddress;
+	pIndex = pHead->index;
+
+	//WaitForSingleObject(hMutex, INFINITE);
+	std::unique_lock<std::mutex> lock(*tabmsg.pmutex_rw);
+
+	// search table in DB's index(hash table)
+	int loc, c;
+	loc = hash1(lpTableName);
+	c = hash2(lpTableName);
+	while (strcmp(pIndex[loc].tablename, "\0") && strcmp(pIndex[loc].tablename, lpTableName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (!strcmp(pIndex[loc].tablename, "\0") || pIndex[loc].erased)
+	{
+		// table not found
+		errorCode = ERROR_TABLE_NOT_EXIST;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	if (recordSize != pIndex[loc].recordsize)
+	{
+		errorCode = ERROR_RECORDSIZE;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	// clear table
+	pIndex[loc].currcount = 0;
+
+	if (pIndex[loc].currcount + count > pIndex[loc].maxcount)
+	{
+		errorCode = ERROR_NO_SPACE;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	memcpy((char*)lpMapAddress + sizeof(DB_HEAD) + pIndex[loc].startpos + recordSize * pIndex[loc].currcount, lpRecords, recordSize * count);
+	pIndex[loc].currcount += count;
+	//_time64(&pIndex[loc].timestamp);
+	clock_gettime(CLOCK_REALTIME, &pIndex[loc].timestamp);
+
+	pHead->counter++;
+	//ReleaseMutex(hMutex);
+	return true;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: SelectTable
+
+Summary:  Select Table.
+
+Args:     const char* lpDBName
+database name
+const char* lpTableName
+table name
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool SelectTable(const char* lpDBName, const char* lpTableName, void** lppRecords, int* pCount, int* pRecordSize, timespec* pWriteTime)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDBName, tabmsg))
+	{
+		return false;
+	}
+
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	DB_HEAD* pHead;
+	DB_INDEX_STRUCT* pIndex;
+	pHead = (DB_HEAD*)lpMapAddress;
+	pIndex = pHead->index;
+
+	//WaitForSingleObject(hMutex, INFINITE);
+	std::lock_guard<std::mutex> lock(*tabmsg.pmutex_rw);
+
+	// search table in DB's index(hash table)
+	int loc, c;
+	loc = hash1(lpTableName);
+	c = hash2(lpTableName);
+	while (strcmp(pIndex[loc].tablename, "\0") && strcmp(pIndex[loc].tablename, lpTableName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (!strcmp(pIndex[loc].tablename, "\0") || pIndex[loc].erased)
+	{
+		// table not found
+		errorCode = ERROR_TABLE_NOT_EXIST;
+		*lppRecords = 0;
+		*pCount = 0;
+		*pRecordSize = 0;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	if (pIndex[loc].currcount == 0)
+	{
+		*lppRecords = 0;
+		*pCount = 0;
+		*pRecordSize = pIndex[loc].recordsize;
+		if (pWriteTime != 0)
+		{
+			*pWriteTime = pIndex[loc].timestamp;
+		}
+		//ReleaseMutex(hMutex);
+		return true;
+	}
+
+	int memsize;
+	void* pBuff;
+
+	memsize = pIndex[loc].recordsize * pIndex[loc].currcount;
+	pBuff = malloc(memsize);
+	if (pBuff == NULL)
+	{
+		*lppRecords = 0;
+		*pCount = 0;
+		*pRecordSize = 0;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	memcpy(pBuff, (char*)lpMapAddress + sizeof(DB_HEAD) + pIndex[loc].startpos, memsize);
+	*lppRecords = pBuff;
+	*pCount = pIndex[loc].currcount;
+	*pRecordSize = pIndex[loc].recordsize;
+	if (pWriteTime != 0)
+	{
+		*pWriteTime = pIndex[loc].timestamp;
+	}
+
+	//ReleaseMutex(hMutex);
+	return true;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: DeleteTable
+
+Summary:  Delete Table.
+
+Args:     const char* lpDBName
+database name
+const char* lpTableName
+table name
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool DeleteTable(const char* lpDBName, const char* lpTableName)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDBName, tabmsg))
+	{
+		return false;
+	}
+
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	DB_HEAD* pHead;
+	DB_INDEX_STRUCT* pIndex;
+	pHead = (DB_HEAD*)lpMapAddress;
+	pIndex = pHead->index;
+
+	//WaitForSingleObject(hMutex, INFINITE);
+	std::unique_lock<std::mutex> lock(*tabmsg.pmutex_rw);
+
+	// search table in DB's index(hash table)
+	int loc, c;
+	loc = hash1(lpTableName);
+	c = hash2(lpTableName);
+	while (strcmp(pIndex[loc].tablename, "\0") && strcmp(pIndex[loc].tablename, lpTableName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (!strcmp(pIndex[loc].tablename, "\0") || pIndex[loc].erased)
+	{
+		// table not found
+		errorCode = ERROR_TABLE_NOT_EXIST;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	strcpy(pIndex[loc].tablename, "CT0D9GG_~$59");	 //不是必需的，只是确保安全
+	pIndex[loc].erased = true;
+	pIndex[loc].currcount = 0;
+
+	int pos = pIndex[loc].startpos;
+	int tablesize = pIndex[loc].recordsize * pIndex[loc].maxcount;
+
+	void* Destination = (char*)lpMapAddress + sizeof(DB_HEAD) + pos;
+	const void* Source = (char*)Destination + tablesize;
+	int Length = pHead->totalsize - sizeof(DB_HEAD) - pos - tablesize;
+	memmove(Destination, Source, Length);
+
+	//mark
+	int typepos = pIndex[loc].typeaddr;
+	int typesize = pIndex[loc].typesize;
+	pIndex[loc].typesize = 0;
+	Destination = (char*)lpMapAddress + pHead->totalsize + typepos;
+	Source = (char*)Destination + typesize;
+	Length = INDEXSIZE * TYPEAVGSIZE - typepos - typesize;
+	memmove(Destination, Source, Length);
+
+	for (int i = 0; i < INDEXSIZE; i++)
+	{
+		//if (strcmp(pIndex[i].tablename, "\0") && !pIndex[i].erased && pIndex[i].startpos > pos)
+		//{
+		//	pIndex[i].startpos -= tablesize;
+		//}
+
+		//mark
+		if (strcmp(pIndex[i].tablename, "\0") && !pIndex[i].erased)
+		{
+			if (pIndex[i].startpos > pos)
+				pIndex[i].startpos -= tablesize;
+
+			if (pIndex[i].typeaddr > typepos)
+				pIndex[i].typeaddr -= typesize;
+		}
+	}
+
+	pHead->nextpos -= tablesize;
+	pHead->remain += tablesize;
+	pHead->indexcount--;
+
+	//mark
+	pHead->nexttypepos -= typesize;
+	pHead->typeremain += typesize;
+
+	//ReleaseMutex(hMutex);
+	return true;
+}
+
+extern "C" bool ClearDB(const char* lpDbName)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDbName, tabmsg))
+	{
+		return false;
+	}
+
+	void* lpMapAddress;
+	lpMapAddress = tabmsg.lpMapAddress;
+	DB_HEAD* pHead;
+	pHead = (DB_HEAD*)lpMapAddress;
+
+	if (pHead->qbdtype != DATABASE_T) return false;
+
+	std::unique_lock<std::mutex> lock(*tabmsg.pmutex_rw);
+
+	int totalsize = pHead->totalsize;
+	int typesize = pHead->typesize;
+	int fileSize = pHead->totalsize + pHead->typesize;
+	//ZeroMemory((char*)pHead->index, sizeof(pHead->index));
+	memset((char*)pHead->index, 0, sizeof(pHead->index));
+	pHead->qbdtype = DATABASE_T;
+	pHead->totalsize = totalsize;	// DB_HEAD和后面数据区大小的和，不包括最后面的类型区
+	pHead->typesize = typesize;		// 最后面的类型区的大小 mark
+	pHead->remain = totalsize - sizeof(DB_HEAD);
+	pHead->typeremain = typesize;
+	pHead->counter = 0;
+	pHead->nextpos = 0;
+	pHead->nexttypepos = 0;
+	pHead->indexcount = 0;
+
+	return true;
+}
+

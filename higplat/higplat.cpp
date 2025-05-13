@@ -283,6 +283,20 @@ inline int hash2(const char* s)
 }
 
 /*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: IsEmptyQ
+
+Summary:  Get error code.
+
+Args:     VOID
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" unsigned int GetLastErrorQ()
+{
+	return errorCode;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
 Function: CreateQ
 
 Summary:  Create queue file according the specified size and tye.
@@ -876,7 +890,7 @@ extern "C" bool MulReadQ2(const char* lpDqName, void** lppRecords, int start, in
 		*pRecordSize = 0;
 		return false;
 	}
-	int memsize;
+	unsigned long memsize;
 	void* pBuff;
 	int readCount;
 	//WaitForSingleObject(hMutex, INFINITE);
@@ -935,4 +949,351 @@ extern "C" bool MulReadQ2(const char* lpDqName, void** lppRecords, int start, in
 		*lppRecords = pBuff;
 		return true;
 	}
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: WriteQ
+
+Summary:  Write a record to queue.
+
+Args:     LPCTSTR  lpDqName
+VOID  *lpRecord
+pointer of record buffer
+int actSize
+size of record
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool WriteQ(const char* lpDqName, void* lpRecord, int actSize, const char* remoteIp)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDqName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	QUEUE_HEAD* pDqHead;
+	pDqHead = (QUEUE_HEAD*)lpMapAddress;
+	int num, size;
+	num = pDqHead->num;
+	size = pDqHead->size;
+
+	// 字符串型且实际长度缺省，用字符串长度加1设定实际长度
+	if ((pDqHead->dataType == ASCII_TYPE) && (actSize == 0))
+	{
+		actSize = (int)(strlen((const char*)lpRecord) + 1);	//mark x64	如果是UNICODE字符串怎么办
+	}
+
+	// 验证记录长度是否相符。
+	if (((pDqHead->dataType == ASCII_TYPE) && (actSize > size))
+		|| ((pDqHead->dataType == BINARY_TYPE) && (actSize != size)))
+	{
+		errorCode = ERROR_RECORDSIZE;
+		return false;
+	}
+
+	// 根据映射内存地址、互斥量对象句柄将一条记录写入数据队列。
+	//WaitForSingleObject(hMutex, INFINITE);
+	pthread_mutex_lock(&hMutex);
+	if (pDqHead->operateMode == NORMAL_MODE)
+	{
+		if ((pDqHead->writePoint + 1) % num == pDqHead->readPoint)
+		{
+			//ReleaseMutex(hMutex);
+			pthread_mutex_unlock(&hMutex);
+			errorCode = ERROR_DQ_FULL;
+			return false;
+		}
+	}
+	pDqHead->writePoint = (pDqHead->writePoint + 1) % num;
+	char* lpwriteAddress;
+	lpwriteAddress = (char*)lpMapAddress + (pDqHead->writePoint) * (size + RECORDHEADSIZE) + QUEUEHEADSIZE;	//x64
+	gettime((char*)lpwriteAddress);
+	RECORD_HEAD* pRecordHead = (RECORD_HEAD*)lpwriteAddress;
+	pRecordHead->ack = 0;
+	if (remoteIp == 0)
+	{
+		strcpy(pRecordHead->remoteIp, "127.0.0.1");
+	}
+	else
+	{
+		strcpy(pRecordHead->remoteIp, remoteIp);
+	}
+	memcpy(lpwriteAddress + RECORDHEADSIZE, lpRecord, actSize);
+	if (pDqHead->operateMode == SHIFT_MODE)
+	{
+		pDqHead->readPoint = 1;
+	}
+	//ReleaseMutex(hMutex);
+	pthread_mutex_unlock(&hMutex);
+	return true;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: ClearQ
+
+Summary:  Clear queue.
+
+Args:     LPCTSTR  lpDqName
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool ClearQ(const char* lpDqName)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDqName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+
+	// 清空数据队列
+	QUEUE_HEAD* pDqHead;
+	pDqHead = (QUEUE_HEAD*)lpMapAddress;
+	//WaitForSingleObject(hMutex, INFINITE);
+	pthread_mutex_lock(&hMutex);
+	if (pDqHead->operateMode == NORMAL_MODE)
+	{
+		pDqHead->readPoint = pDqHead->writePoint = pDqHead->num - 1;
+	}
+	else
+	{
+		pDqHead->readPoint = 0;
+	}
+	//ReleaseMutex(hMutex);
+	pthread_mutex_unlock(&hMutex);
+	return false;
+}
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: SetPtrQ
+
+Summary:  Set read and write pointer of queue.
+
+Args:     LPCTSTR  lpDqName, int readPtr, int writePtr
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool SetPtrQ(const char* lpDqName, int readPtr, int writePtr)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDqName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	QUEUE_HEAD* pDqHead;
+	pDqHead = (QUEUE_HEAD*)lpMapAddress;
+	int num;
+	num = pDqHead->num;
+
+	if (readPtr >= 0 && writePtr >= 0 && readPtr < num && writePtr < num)
+	{
+		//WaitForSingleObject(hMutex, INFINITE);
+		pthread_mutex_lock(&hMutex);
+		pDqHead->readPoint = readPtr;
+		pDqHead->writePoint = writePtr;
+		//ReleaseMutex(hMutex);
+		pthread_mutex_unlock(&hMutex);
+		return true;
+	}
+
+	if (readPtr >= 0 && readPtr < num && writePtr == -1)
+	{
+		//WaitForSingleObject(hMutex, INFINITE);
+		pthread_mutex_lock(&hMutex);
+		pDqHead->readPoint = readPtr;
+		//ReleaseMutex(hMutex);
+		pthread_mutex_unlock(&hMutex);
+		return true;
+	}
+
+	if (writePtr >= 0 && writePtr < num && readPtr == -1)
+	{
+		//WaitForSingleObject(hMutex, INFINITE);
+		pthread_mutex_lock(&hMutex);
+		pDqHead->writePoint = writePtr;
+		//ReleaseMutex(hMutex);
+		pthread_mutex_unlock(&hMutex);
+		return true;
+	}
+
+	return false;
+}
+
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: PeekQ
+
+Summary:  Read a record but not remove it from queue.
+
+Args:     LPCTSTR  lpDqName
+VOID  *lpRecord
+pointer of record buffer
+int actSize
+size of record
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool PeekQ(const char* lpDqName, void* lpRecord, int actSize)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDqName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+
+	// 根据映射内存地址、互斥量对象句柄从数据队列取出一条记录。
+	QUEUE_HEAD* pDqHead;
+	pDqHead = (QUEUE_HEAD*)lpMapAddress;
+	int num, size;
+	num = pDqHead->num;
+	size = pDqHead->size;
+
+	// 验证记录长度是否相符。
+	if (((pDqHead->dataType == ASCII_TYPE) && (actSize < size))
+		|| ((pDqHead->dataType == BINARY_TYPE) && (actSize != size)))
+	{
+		errorCode = ERROR_RECORDSIZE;
+		return false;
+	}
+
+	// 本函数不支持移位队列。
+	if (pDqHead->operateMode == SHIFT_MODE)
+	{
+		errorCode = ERROR_OPERATE_PROHIBIT;
+		return false;
+	}
+
+	//WaitForSingleObject(hMutex, INFINITE);
+	pthread_mutex_lock(&hMutex);
+	if (pDqHead->readPoint != pDqHead->writePoint)
+	{
+		memcpy(lpRecord, (char*)lpMapAddress + ((pDqHead->readPoint + 1) % num) * (size + RECORDHEADSIZE) + QUEUEHEADSIZE + RECORDHEADSIZE, size);
+		//ReleaseMutex(hMutex);
+		pthread_mutex_unlock(&hMutex);
+		return true;
+	}
+	//ReleaseMutex(hMutex);
+	pthread_mutex_unlock(&hMutex);
+	errorCode = ERROR_DQ_EMPTY;
+	return false;
+}
+
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: IsEmptyQ
+
+Summary:  Judge whether queue is empty.
+
+Args:     LPCTSTR  lpDqName
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool IsEmptyQ(const char* lpDqName)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDqName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+
+	// 根据映射内存地址、互斥量对象句柄从数据队列取出一条记录。
+	QUEUE_HEAD* pDqHead;
+	pDqHead = (QUEUE_HEAD*)lpMapAddress;
+	//WaitForSingleObject(hMutex, INFINITE);
+	pthread_mutex_lock(&hMutex);
+	if (pDqHead->operateMode == NORMAL_MODE)
+	{
+		if (pDqHead->readPoint != pDqHead->writePoint)
+		{
+			//ReleaseMutex(hMutex);
+			pthread_mutex_unlock(&hMutex);
+			return false;
+		}
+	}
+	else
+	{
+		if (pDqHead->readPoint != 0)
+		{
+			//ReleaseMutex(hMutex);
+			pthread_mutex_unlock(&hMutex);
+			return false;
+		}
+	}
+	//ReleaseMutex(hMutex);
+	pthread_mutex_unlock(&hMutex);
+	return true;
+}
+
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: IsFullQ
+
+Summary:  Judge whether queue is full.
+
+Args:     LPCTSTR  lpDqName
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool IsFullQ(const char* lpDqName)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDqName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+
+	// 根据映射内存地址、互斥量对象句柄从数据队列取出一条记录。
+	QUEUE_HEAD* pDqHead;
+	int num;
+	pDqHead = (QUEUE_HEAD*)lpMapAddress;
+	num = pDqHead->num;
+	//WaitForSingleObject(hMutex, INFINITE);
+	pthread_mutex_lock(&hMutex);
+	if (pDqHead->operateMode == NORMAL_MODE)
+	{
+		if ((pDqHead->writePoint + 1) % num != pDqHead->readPoint)
+		{
+			//ReleaseMutex(hMutex);
+			pthread_mutex_unlock(&hMutex);
+			return false;
+		}
+	}
+	else
+	{
+		//ReleaseMutex(hMutex);
+		pthread_mutex_unlock(&hMutex);
+		return false;
+	}
+	//ReleaseMutex(hMutex);
+	pthread_mutex_unlock(&hMutex);
+	return true;
 }

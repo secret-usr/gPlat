@@ -1297,3 +1297,118 @@ extern "C" bool IsFullQ(const char* lpDqName)
 	pthread_mutex_unlock(&hMutex);
 	return true;
 }
+
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: CreateB
+
+Summary:  Create bulletin file according the specified size.
+
+Args:     LPCTSTR  lpFileName
+bulletin/file name
+int size
+bulletin data size, the file size includes bulletin data size
+and head size.
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool CreateB(const char* lpFileName, int size)
+{
+	usereason = 0;
+
+	// 检查文件名长度是否超过定义长度
+	if (strlen(lpFileName) > MAXDQNAMELENTH)
+	{
+		errorCode = ERROR_FILENAME_TOO_LONG;
+		return false;
+	}
+
+	// 形成文件路径全名
+	char dqFileName[100];
+	strcpy(dqFileName, dataQuePath);
+	strcat(dqFileName, lpFileName);
+
+	// 先查找同名文件删除之
+	if (fs::exists(dqFileName))
+	{
+		if (!fs::remove(dqFileName)) {		//C++17
+			errorCode = ERROR_FILE_IN_USE;
+			return false;
+		}
+	}
+
+	// 创建文件
+	try {
+		// 创建父目录（如果不存在）
+		fs::path path(dqFileName);
+		if (path.has_parent_path() && !fs::exists(path.parent_path())) {
+			fs::create_directories(path.parent_path());
+		}
+
+		// 创建文件
+		std::ofstream newfile(dqFileName);
+		if (newfile.is_open()) {
+			newfile.close();
+		}
+		else {
+			errorCode = ERROR_FILE_CREATE_FAILSURE;
+			return false;
+		}
+	}
+	catch (const std::exception& e) {
+		std::cerr << "create file error: " << e.what() << std::endl;
+		errorCode = ERROR_FILE_CREATE_FAILSURE;
+		return false;
+	}
+
+	// 计算文件大小
+	int fileSize;
+	//fileSize = sizeof(BOARD_HEAD) + size + INDEXSIZE * TYPEMAXSIZE;
+	fileSize = sizeof(BOARD_HEAD) + size + INDEXSIZE * TYPEAVGSIZE;	//mark
+
+	// 1. 创建或打开文件（O_CREAT | O_RDWR 表示不存在则创建，存在则打开可读写）
+	int fd = open(dqFileName, O_CREAT | O_RDWR, 0644);
+	if (fd == -1) {
+		std::cerr << "打开/创建文件失败: " << strerror(errno) << std::endl;
+		return false;
+	}
+
+	// 2. 将文件扩展至目标大小
+	if (ftruncate(fd, fileSize) == -1) {
+		std::cerr << "调整文件大小失败: " << strerror(errno) << std::endl;
+		close(fd);
+		return false;
+	}
+
+	// 3. 内存映射文件
+	void* lpMapAddress = mmap(nullptr, fileSize, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+	if (lpMapAddress == MAP_FAILED) {
+		std::cerr << "内存映射失败: " << strerror(errno) << std::endl;
+		close(fd);
+		return false;
+	}
+
+	// 初始化公告板头和数据区
+	memset(lpMapAddress, 0, fileSize);
+	BOARD_HEAD* pHead;
+	pHead = (BOARD_HEAD*)lpMapAddress;
+	pHead->qbdtype = BOARD_T;
+	pHead->totalsize = sizeof(BOARD_HEAD) + size;	// BOARD_HEAD和后面数据区大小的和，不包括最后面的类型区
+	pHead->typesize = INDEXSIZE * TYPEAVGSIZE;		// 最后面的类型区的大小 mark
+	pHead->remain = size;
+	pHead->typeremain = INDEXSIZE * TYPEAVGSIZE;	// mark
+	pHead->counter = 0;
+	pHead->nextpos = 0;
+	pHead->nexttypepos = 0;
+	pHead->indexcount = 0;
+
+	// 5. 同步数据到磁盘（可选）
+	if (msync(lpMapAddress, fileSize, MS_SYNC) == -1) {
+		std::cerr << "同步到磁盘失败: " << strerror(errno) << std::endl;
+	}
+
+	// 6. 解除映射并关闭文件
+	munmap(lpMapAddress, fileSize);
+	close(fd);
+
+	return true;
+}

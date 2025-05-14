@@ -15,7 +15,7 @@ int main(int argc, char* argv[])
 	number = 0;
 	size = 0;
 	mode = NORMAL_MODE;
-	type = ASCII_TYPE;
+	type = BINARY_TYPE;
 
 	int i;
 	for (i = 1; i < argc; i++)
@@ -32,14 +32,14 @@ int main(int argc, char* argv[])
 				size = (uint)atoi(argv[++i]);
 				break;
 
-			case 'b':
-				type = BINARY_TYPE;
-				break;
+			//case 'b':
+			//	type = BINARY_TYPE;
+			//	break;
 
 			case 's':
 				mode = SHIFT_MODE;
 				break;
-				// Help.
+			// Help.
 			case 'h':
 			case '?':
 			default:

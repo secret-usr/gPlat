@@ -86,6 +86,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <RemoteOutRelDir>$(Platform)/$(Configuration)</RemoteOutRelDir>
+    <RemoteDeployDir>$(RemoteRootDir)/$(ProjectName)</RemoteDeployDir>
   </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="higplat.cpp" />
@@ -97,6 +98,10 @@
     <ClCompile>
       <CppLanguageStandard>c++17</CppLanguageStandard>
     </ClCompile>
+    <RemotePostBuildEvent>
+      <Command>sudo cp $(RemoteRootDir)/$(Platform)/$(Configuration)/lib$(ProjectName).so /usr/local/lib/
+sudo ldconfig</Command>
+    </RemotePostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

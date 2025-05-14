@@ -35,9 +35,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{4056c21b-7132-4687-bf10-30589b63c7e0}</ProjectGuid>
+    <ProjectGuid>{f4faf2a7-a67b-40a9-a0fb-fcd4eadbade5}</ProjectGuid>
     <Keyword>Linux</Keyword>
-    <RootNamespace>include</RootNamespace>
+    <RootNamespace>createq</RootNamespace>
     <MinimumVisualStudioVersion>15.0</MinimumVisualStudioVersion>
     <ApplicationType>Linux</ApplicationType>
     <ApplicationTypeRevision>1.0</ApplicationTypeRevision>
@@ -74,13 +74,15 @@
   <ImportGroup Label="Shared" />
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <TargetExt />
+    <RemoteOutRelDir>$(Platform)/$(Configuration)</RemoteOutRelDir>
+    <OutDir>$(ProjectDir)..\$(Platform)\$(Configuration)\</OutDir>
+  </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="hello.h" />
-    <ClInclude Include="higplat.h" />
-    <ClInclude Include="msg.h" />
   </ItemGroup>
   <ItemDefinitionGroup />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

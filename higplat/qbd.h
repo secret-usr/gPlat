@@ -1,7 +1,7 @@
 #include <chrono>
 #include <mutex>
 
-#define MAXDQNAMELENTH 40	// 必须和dataqueue.h中的定义一致
+#define MAXDQNAMELENTH 40	// 必须和higplat.h中的定义一致
 
 #define ERROR_DQFILE_NOT_FOUND			0x00000000L
 #define ERROR_DQ_NOT_OPEN				0x00000001L

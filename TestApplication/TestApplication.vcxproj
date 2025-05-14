@@ -75,7 +75,7 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <CopyAdditionalIncludes>true</CopyAdditionalIncludes>
+    <CopyAdditionalIncludes>false</CopyAdditionalIncludes>
     <LibraryPath>
     </LibraryPath>
     <RemoteOutRelDir>$(Platform)/$(Configuration)</RemoteOutRelDir>

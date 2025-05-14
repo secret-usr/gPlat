@@ -199,7 +199,7 @@ extern "C" bool CreateQ(const char* lpFileName, int recordSize, int recordNum, i
 //DllImport BOOL __cdecl WriteBOffSet_ReadBack( LPCTSTR lpBulletinName, LPCTSTR lpItemName, VOID  *lpItem, int actSize, int offSet, int actSubSize );
 //DllImport BOOL __cdecl GetCopyB( LPCTSTR lpBulletinName, BYTE * pBulletin, unsigned int * pCounter );
 //DllImport BOOL __cdecl RefreshB( LPCTSTR lpBulletinName, BYTE* pBulletin, unsigned int * pCounter=0 );
-//DllImport DWORD __cdecl GetLastErrorQ( VOID );
+extern "C" bool GetLastErrorQ();
 //DllImport BOOL __cdecl ReadLastWrTimeQ( LPCTSTR  lpDqName, BYTE* buf );
 //DllImport BOOL __cdecl ReConnectServer(HANDLE hServer);
 //DllImport HANDLE __cdecl ConnectServer( LPCTSTR  lpServerName );

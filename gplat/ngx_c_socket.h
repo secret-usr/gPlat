@@ -151,7 +151,9 @@ private:
 	
 protected:
 	//一些和网络通讯有关的成员变量
-	size_t                         m_iLenPkgHeader;                       //sizeof(COMM_PKG_HEADER);		
+	//gyb
+	//size_t                         m_iLenPkgHeader;                       //sizeof(COMM_PKG_HEADER);
+	size_t                         m_iLenPkgHeader;                       //sizeof(MSGHEAD)
 	size_t                         m_iLenMsgHeader;                       //sizeof(STRUC_MSG_HEADER);
 	
 private:

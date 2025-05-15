@@ -43,7 +43,9 @@ CSocekt::CSocekt()
 	//m_pwrite_events = NULL;      //写事件数组给空
 
 	//一些和网络通讯有关的常用变量值，供后续频繁使用时提高效率
-	m_iLenPkgHeader = sizeof(COMM_PKG_HEADER);    //包头的sizeof值【占用的字节数】
+	//gyb
+	//m_iLenPkgHeader = sizeof(COMM_PKG_HEADER);    //包头的sizeof值【占用的字节数】
+	m_iLenPkgHeader = sizeof(MSGHEAD);    //包头的sizeof值【占用的字节数】
 	m_iLenMsgHeader = sizeof(STRUC_MSG_HEADER);  //消息头的sizeof值【占用的字节数】
 
 	//多线程相关
@@ -776,7 +778,9 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 				pSocketObj->m_MsgSendQueue.erase(pos2);
 				--pSocketObj->m_iSendMsgQueueCount;      //发送消息队列容量少1	
 				p_Conn->psendbuf = (char*)pPkgHeader;   //要发送的数据的缓冲区指针，因为发送数据不一定全部都能发送出去，我们要记录数据发送到了哪里，需要知道下次数据从哪里开始发送
-				itmp = ntohs(pPkgHeader->pkgLen);        //包头+包体 长度 ，打包时用了htons【本机序转网络序】，所以这里为了得到该数值，用了个ntohs【网络序转本机序】；
+				//gyb
+				//itmp = ntohs(pPkgHeader->pkgLen);        //包头+包体 长度 ，打包时用了htons【本机序转网络序】，所以这里为了得到该数值，用了个ntohs【网络序转本机序】；
+				itmp = pPkgHeader->pkgLen;        //包头+包体 长度
 				p_Conn->isendlen = itmp;                 //要发送多少数据，因为发送数据不一定全部都能发送出去，我们需要知道剩余有多少数据还没发送
 
 				//这里是重点，我们采用 epoll水平触发的策略，能走到这里的，都应该是还没有投递 写事件 到epoll中

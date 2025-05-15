@@ -44,6 +44,7 @@ int main(int argc, char* argv[])
 			case '?':
 			default:
 				Usage(argv[0]);
+				return 0;
 			}
 		}
 		else
@@ -56,12 +57,13 @@ int main(int argc, char* argv[])
 		Usage(argv[0]);
 		return 0;
 	}
+
 	if (CreateQ(lpname, size, number, type, mode))
 	{
-		printf("Queue \'%s\' created successfully!", lpname);
+		printf("Queue \'%s\' created successfully!\n", lpname);
 		return 0;
 	}
-	printf("Create queue \'%s\' fail with error code %d", lpname, GetLastErrorQ());
+	printf("Create queue \'%s\' fail with error code %d\n", lpname, GetLastErrorQ());
 	return 0;
 }
 

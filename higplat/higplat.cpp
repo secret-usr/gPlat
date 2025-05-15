@@ -7,6 +7,20 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <time.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <string.h>
+
+
 #include "../include/msg.h"
 #include "qbd.h"
 
@@ -282,6 +296,181 @@ inline int hash2(const char* s)
 	return remain == 0 ? 1 : remain;
 }
 
+int setnonblocking(int fd)
+{
+	int old_option = fcntl(fd, F_GETFL);
+	int new_option = old_option | O_NONBLOCK;
+	fcntl(fd, F_SETFL, new_option);
+	return old_option;
+}
+
+int setblocking(int fd)
+{
+	int old_option = fcntl(fd, F_GETFL);
+	int new_option = old_option & ~O_NONBLOCK;
+	fcntl(fd, F_SETFL, new_option);
+	return old_option;
+}
+
+int unblock_connect(const char* ip, int port, int time)
+{
+	int ret = 0;
+	struct sockaddr_in address;
+	bzero(&address, sizeof(address));
+	address.sin_family = AF_INET;
+	inet_pton(AF_INET, ip, &address.sin_addr);
+	address.sin_port = htons(port);
+
+	int sockfd = socket(PF_INET, SOCK_STREAM, 0);
+	int fdopt = setnonblocking(sockfd);
+	ret = connect(sockfd, (struct sockaddr*)&address, sizeof(address));
+	if (ret == 0)
+	{
+		printf("connect with server immediately\n");
+		fcntl(sockfd, F_SETFL, fdopt);
+		return sockfd;
+	}
+	else if (errno != EINPROGRESS)
+	{
+		printf("unblock connect not support\n");
+		return -1;
+	}
+
+	fd_set readfds;
+	fd_set writefds;
+	struct timeval timeout;
+
+	FD_ZERO(&readfds);
+	FD_SET(sockfd, &writefds);
+
+	timeout.tv_sec = time;
+	timeout.tv_usec = 0;
+
+	ret = select(sockfd + 1, NULL, &writefds, NULL, &timeout);
+	if (ret <= 0)
+	{
+		printf("connection time out\n");
+		close(sockfd);
+		return -1;
+	}
+
+	if (!FD_ISSET(sockfd, &writefds))
+	{
+		printf("no events on sockfd found\n");
+		close(sockfd);
+		return -1;
+	}
+
+	int error = 0;
+	socklen_t length = sizeof(error);
+	if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &error, &length) < 0)
+	{
+		printf("get socket option failed\n");
+		close(sockfd);
+		return -1;
+	}
+
+	if (error != 0)
+	{
+		printf("connection failed after select with the error: %d \n", error);
+		close(sockfd);
+		return -1;
+	}
+
+	printf("connection ready after select with the socket: %d \n", sockfd);
+	fcntl(sockfd, F_SETFL, fdopt);
+	return sockfd;
+}
+
+int send_all(int sockfd, const void* buf, size_t len) {
+	size_t total_sent = 0;
+	while (total_sent < len) {
+		int sent = send(sockfd, (char*)buf + total_sent, len - total_sent, 0);
+		if (sent <= 0) return sent; // 错误或连接关闭
+		total_sent += sent;
+	}
+	return total_sent;
+}
+
+/**
+ * 阻塞读取指定字节数的数据
+ * @param sockfd 套接字描述符
+ * @param buf 接收缓冲区
+ * @param len 需要读取的字节数
+ * @return 成功返回实际读取的字节数(等于len)，失败返回-1
+ */
+ssize_t readn(int sockfd, void* buf, size_t len) {
+	size_t nleft = len;    // 剩余需要读取的字节数
+	ssize_t nread;         // 每次读取的字节数
+	char* ptr = (char*)buf;  // 当前读取位置
+
+	while (nleft > 0) {
+		nread = read(sockfd, ptr, nleft);
+
+		if (nread < 0) {
+			if (errno == EINTR) {  // 被信号中断
+				nread = 0;         // 重新调用read
+			}
+			else {
+				return -1;         // 其他错误
+			}
+		}
+		else if (nread == 0) {   // EOF，对端关闭连接
+			break;                  // 返回已读取的字节数(小于len)
+		}
+
+		nleft -= nread;
+		ptr += nread;
+	}
+
+	return (len - nleft);  // 返回实际读取的字节数
+}
+
+//变体版本（带超时控制）
+ssize_t readn_timeout(int sockfd, void* buf, size_t len, int timeout_sec) {
+	fd_set readfds;
+	struct timeval tv;
+	size_t nleft = len;
+	ssize_t nread;
+	char* ptr = (char*)buf;
+
+	while (nleft > 0) {
+		FD_ZERO(&readfds);
+		FD_SET(sockfd, &readfds);
+		tv.tv_sec = timeout_sec;
+		tv.tv_usec = 0;
+
+		int ret = select(sockfd + 1, &readfds, NULL, NULL, &tv);
+		if (ret == -1) {
+			if (errno == EINTR) continue;
+			return -1;
+		}
+		else if (ret == 0) {
+			errno = ETIMEDOUT;
+			return -1;
+		}
+
+		nread = read(sockfd, ptr, nleft);
+		// 其余处理与普通版本相同...
+		if (nread < 0) {
+			if (errno == EINTR) {  // 被信号中断
+				nread = 0;         // 重新调用read
+			}
+			else {
+				return -1;         // 其他错误
+			}
+		}
+		else if (nread == 0) {   // EOF，对端关闭连接
+			break;                  // 返回已读取的字节数(小于len)
+		}
+
+		nleft -= nread;
+		ptr += nread;
+	}
+
+	return (len - nleft);
+}
+
 /*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
 Function: IsEmptyQ
 
@@ -294,6 +483,92 @@ F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
 extern "C" unsigned int GetLastErrorQ()
 {
 	return errorCode;
+}
+
+extern "C" int connectgplat(const char* server, int port)
+{
+	int sockfd = unblock_connect(server, port, 2);
+	if (sockfd < 0)
+	{
+		printf("connect to gplat failed\n");
+		return -1;
+	}
+	else
+	{
+		setblocking(sockfd);	//后面用阻塞模式读写SOCKET
+		printf("connect to gplat success\n");
+		return sockfd;
+	}
+}
+
+extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error)
+{
+	bool   fSuccess = false;
+	int  cbBytesRead, cbWritten;
+	MSGSTRUCT     msg;
+
+	msg.head.id = WRITEQ;
+	strcpy(msg.head.qname, qname);
+	msg.head.datasize = actsize;
+	msg.head.bodysize = actsize;
+	if (msg.head.bodysize > MAXMSGLEN)
+	{
+		*error = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
+	{
+		if (send_all(sockfd, record, actsize) > 0)
+		{
+			fSuccess = true;
+		}
+		else
+		{
+			fSuccess = false;
+		}
+	}
+	
+	if (!fSuccess)
+	{
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+	else
+	{
+		// Read client requests.
+		cbBytesRead = readn(sockfd, &msg, sizeof(MSGHEAD));
+
+		if (cbBytesRead < 0)
+		{
+			*error = errno;
+			close(sockfd);
+			return false;
+		}
+
+		if (msg.head.bodysize > 0)
+		{
+			cbBytesRead = readn(sockfd, msg.body, msg.head.bodysize);
+			if (cbBytesRead < 0)
+			{
+				*error = errno;
+				close(sockfd);
+				return false;
+			}
+		}
+
+		if (cbBytesRead != sizeof(MSGHEAD) + msg.head.bodysize)
+		{
+			*error = ERROR_MSGSIZE;
+			return false;
+		}
+
+		*error = msg.head.error;
+		if (*error != 0)
+			return false;
+	}
+	return true;
 }
 
 /*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F

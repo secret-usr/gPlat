@@ -184,15 +184,21 @@ void CSocekt::ngx_wait_request_handler_proc_p1(lpngx_connection_t pConn)
 {
 	CMemory* p_memory = CMemory::GetInstance();
 
-	LPCOMM_PKG_HEADER pPkgHeader;
-	pPkgHeader = (LPCOMM_PKG_HEADER)pConn->dataHeadInfo; //正好收到包头时，包头信息肯定是在dataHeadInfo里；
+	//LPCOMM_PKG_HEADER pPkgHeader;
+	//pPkgHeader = (LPCOMM_PKG_HEADER)pConn->dataHeadInfo; //正好收到包头时，包头信息肯定是在dataHeadInfo里；
+	PMSGHEAD pPkgHeader;
+	pPkgHeader = (PMSGHEAD)pConn->dataHeadInfo; //正好收到包头时，包头信息肯定是在dataHeadInfo里；
 
 	unsigned short e_pkgLen;
-	e_pkgLen = ntohs(pPkgHeader->pkgLen);  //注意这里网络序转本机序，所有传输到网络上的2字节数据，都要用htons()转成网络序，所有从网络上收到的2字节数据，都要用ntohs()转成本机序
+	//gyb
+	//e_pkgLen = ntohs(pPkgHeader->pkgLen);  //注意这里网络序转本机序，所有传输到网络上的2字节数据，都要用htons()转成网络序，所有从网络上收到的2字节数据，都要用ntohs()转成本机序
+	e_pkgLen = pPkgHeader->bodysize;	//包体的大小，不含包头MSGHEAD的大小
 	//ntohs/htons的目的就是保证不同操作系统数据之间收发的正确性，【不管客户端/服务器是什么操作系统，发送的数字是多少，收到的就是多少】
 	//不明白的同学，直接百度搜索"网络字节序" "主机字节序" "c++ 大端" "c++ 小端"
-//恶意包或者错误包的判断
-	if (e_pkgLen < m_iLenPkgHeader)
+	//恶意包或者错误包的判断
+	//gyb
+	//if (e_pkgLen < m_iLenPkgHeader)
+	if (e_pkgLen < 0)
 	{
 		//伪造包/或者包错误，否则整个包长怎么可能比包头还小？（整个包长是包头+包体，就算包体为0字节，那么至少e_pkgLen == m_iLenPkgHeader）
 		//报文总长度 < 包头长度，认定非法用户，废包
@@ -200,6 +206,8 @@ void CSocekt::ngx_wait_request_handler_proc_p1(lpngx_connection_t pConn)
 		pConn->curStat = _PKG_HD_INIT;
 		pConn->precvbuf = pConn->dataHeadInfo;
 		pConn->irecvlen = m_iLenPkgHeader;
+
+		//gyb 这里难道不断开连接吗？还要继续收下一个包？还是说直接断开连接？我觉得应该断开连接，直接关闭socket，释放连接池中连接
 	}
 	else if (e_pkgLen > (_PKG_MAX_LENGTH - 1000))   //客户端发来包居然说包长度 > 29000?肯定是恶意包
 	{
@@ -208,12 +216,16 @@ void CSocekt::ngx_wait_request_handler_proc_p1(lpngx_connection_t pConn)
 		pConn->curStat = _PKG_HD_INIT;
 		pConn->precvbuf = pConn->dataHeadInfo;
 		pConn->irecvlen = m_iLenPkgHeader;
+
+		//gyb 这里难道不断开连接吗？还要继续收下一个包？还是说直接断开连接？我觉得应该断开连接，直接关闭socket，释放连接池中连接
 	}
 	else
 	{
 		//合法的包头，继续处理
 		//我现在要分配内存开始收包体，因为包体长度并不是固定的，所以内存肯定要new出来；
-		char* pTmpBuffer = (char*)p_memory->AllocMemory(m_iLenMsgHeader + e_pkgLen, false); //分配内存【长度是 消息头长度  + 包头长度 + 包体长度】，最后参数先给false，表示内存不需要memset;
+		//gyb
+		//char* pTmpBuffer = (char*)p_memory->AllocMemory(m_iLenMsgHeader + e_pkgLen, false); //分配内存【长度是 消息头长度  + 包头长度 + 包体长度】，最后参数先给false，表示内存不需要memset;
+		char* pTmpBuffer = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + e_pkgLen, false); //分配内存【长度是 消息头长度  + 包头长度 + 包体长度】，最后参数先给false，表示内存不需要memset;
 		//c->ifnewrecvMem   = true;        //标记我们new了内存，将来在ngx_free_connection()要回收的
 		pConn->precvMemPointer = pTmpBuffer;  //内存开始指针
 
@@ -224,7 +236,9 @@ void CSocekt::ngx_wait_request_handler_proc_p1(lpngx_connection_t pConn)
 		//b)再填写包头内容
 		pTmpBuffer += m_iLenMsgHeader;                 //往后跳，跳过消息头，指向包头
 		memcpy(pTmpBuffer, pPkgHeader, m_iLenPkgHeader); //直接把收到的包头拷贝进来
-		if (e_pkgLen == m_iLenPkgHeader)
+		//gyb
+		//if (e_pkgLen == m_iLenPkgHeader)
+		if (e_pkgLen == 0)
 		{
 			//该报文只有包头无包体【我们允许一个包只有包头，没有包体】
 			//这相当于收完整了，则直接入消息队列待后续业务逻辑线程去处理吧
@@ -235,7 +249,9 @@ void CSocekt::ngx_wait_request_handler_proc_p1(lpngx_connection_t pConn)
 			//开始收包体，注意我的写法
 			pConn->curStat = _PKG_BD_INIT;                   //当前状态发生改变，包头刚好收完，准备接收包体	    
 			pConn->precvbuf = pTmpBuffer + m_iLenPkgHeader;  //pTmpBuffer指向包头，这里 + m_iLenPkgHeader后指向包体 weizhi
-			pConn->irecvlen = e_pkgLen - m_iLenPkgHeader;    //e_pkgLen是整个包【包头+包体】大小，-m_iLenPkgHeader【包头】  = 包体
+			//gyb
+			//pConn->irecvlen = e_pkgLen - m_iLenPkgHeader;    //e_pkgLen是整个包【包头+包体】大小，-m_iLenPkgHeader【包头】  = 包体
+			pConn->irecvlen = e_pkgLen;    //e_pkgLen是+包体大小
 		}
 	}  //end if(e_pkgLen < m_iLenPkgHeader) 
 
@@ -251,6 +267,7 @@ void CSocekt::ngx_wait_request_handler_proc_plast(lpngx_connection_t pConn)
 	//激发线程池中的某个线程来处理业务逻辑
 	//g_threadpool.Call(irmqc);
 
+	//如果是单线程的，可以改成直接调用业务逻辑处理函数
 	g_threadpool.inMsgRecvQueueAndSignal(pConn->precvMemPointer); //入消息队列并触发线程处理消息
 
 	//c->ifnewrecvMem    = false;            //内存不再需要释放，因为你收完整了包，这个包被上边调用inMsgRecvQueue()移入消息队列，那么释放内存就属于业务逻辑去干，不需要回收连接到连接池中干了

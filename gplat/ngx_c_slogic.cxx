@@ -84,7 +84,10 @@ void CLogicSocket::threadRecvProcFunc(char* pMsgBuf)
 	LPSTRUC_MSG_HEADER pMsgHeader = (LPSTRUC_MSG_HEADER)pMsgBuf;                  //消息头
 	LPCOMM_PKG_HEADER  pPkgHeader = (LPCOMM_PKG_HEADER)(pMsgBuf + m_iLenMsgHeader); //包头
 	void* pPkgBody;                                                              //指向包体的指针
-	unsigned short pkglen = ntohs(pPkgHeader->pkgLen);                            //客户端指明的包宽度【包头+包体】
+
+	//gyb
+	//unsigned short pkglen = ntohs(pPkgHeader->pkgLen);                            //客户端指明的包宽度【包头+包体】
+	unsigned short pkglen = pPkgHeader->pkgLen;                            //客户端指明的包宽度【包头+包体】
 
 	if (m_iLenPkgHeader == pkglen)
 	{
@@ -111,7 +114,9 @@ void CLogicSocket::threadRecvProcFunc(char* pMsgBuf)
 	}
 
 	//包crc校验OK才能走到这里    	
-	unsigned short imsgCode = ntohs(pPkgHeader->msgCode); //消息代码拿出来
+	//gyb
+	//unsigned short imsgCode = ntohs(pPkgHeader->msgCode); //消息代码拿出来
+	unsigned short imsgCode = pPkgHeader->msgCode; //消息代码拿出来
 	lpngx_connection_t p_Conn = pMsgHeader->pConn;        //消息头中藏着连接池中连接的指针
 
 	//我们要做一些判断
@@ -186,8 +191,11 @@ bool CLogicSocket::_HandleRegister(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER 
 	//c)填充包头
 	pPkgHeader = (LPCOMM_PKG_HEADER)(p_sendbuf + m_iLenMsgHeader);    //指向包头
 	pPkgHeader->msgCode = _CMD_REGISTER;	                        //消息代码，可以统一在ngx_logiccomm.h中定义
-	pPkgHeader->msgCode = htons(pPkgHeader->msgCode);	            //htons主机序转网络序 
-	pPkgHeader->pkgLen = htons(m_iLenPkgHeader + iSendLen);        //整个包的尺寸【包头+包体尺寸】 
+	//gyb
+	//pPkgHeader->msgCode = htons(pPkgHeader->msgCode);	            //htons主机序转网络序 
+	//pPkgHeader->pkgLen = htons(m_iLenPkgHeader + iSendLen);       //整个包的尺寸【包头+包体尺寸】
+	pPkgHeader->msgCode = pPkgHeader->msgCode;						//
+	pPkgHeader->pkgLen = m_iLenPkgHeader + iSendLen;				//整个包的尺寸【包头+包体尺寸】 
 	//d)填充包体
 	LPSTRUCT_REGISTER p_sendInfo = (LPSTRUCT_REGISTER)(p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader);	//跳过消息头，跳过包头，就是包体了
 	//。。。。。这里根据需要，填充要发回给客户端的内容,int类型要使用htonl()转，short类型要使用htons()转；

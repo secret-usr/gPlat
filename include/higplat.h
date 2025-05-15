@@ -146,6 +146,8 @@ struct DB_HEAD
 #define QUEUEHEADSIZE   sizeof(QUEUE_HEAD)
 #define RECORDHEADSIZE  sizeof(RECORD_HEAD)
 
+extern "C" int connectgplat(const char* server, int port);
+extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error);
 //DllImport BOOL __cdecl GetQueuePath(LPTSTR lpPath, size_t count);
 //DllImport BOOL __cdecl CreateB(LPCTSTR  lpFileName, int size);
 //DllImport BOOL __cdecl CreateItem( LPCTSTR lpBoardName, LPCTSTR lpItemName, int itemSize, VOID * pType=0, int typeSize=0 );

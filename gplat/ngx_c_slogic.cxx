@@ -51,7 +51,8 @@ static const handler statusHandler[] =
 	&CLogicSocket::_HandleRegister,                         //【5】：实现具体的注册功能
 	&CLogicSocket::_HandleLogIn,                            //【6】：实现具体的登录功能
 	//......其他待扩展，比如实现攻击功能，实现加血功能等等；
-
+	//gyb
+	& CLogicSocket::WriteQ,									//【7】：实现具体的登录功能
 
 };
 #define AUTH_TOTAL_COMMANDS sizeof(statusHandler)/sizeof(handler) //整个命令有多少个，编译时即可知道
@@ -82,41 +83,43 @@ bool CLogicSocket::Initialize()
 void CLogicSocket::threadRecvProcFunc(char* pMsgBuf)
 {
 	LPSTRUC_MSG_HEADER pMsgHeader = (LPSTRUC_MSG_HEADER)pMsgBuf;                  //消息头
-	LPCOMM_PKG_HEADER  pPkgHeader = (LPCOMM_PKG_HEADER)(pMsgBuf + m_iLenMsgHeader); //包头
+	//LPCOMM_PKG_HEADER  pPkgHeader = (LPCOMM_PKG_HEADER)(pMsgBuf + m_iLenMsgHeader); //包头
+	PMSGHEAD  pPkgHeader = (PMSGHEAD)(pMsgBuf + m_iLenMsgHeader); //包头
 	void* pPkgBody;                                                              //指向包体的指针
 
 	//gyb
 	//unsigned short pkglen = ntohs(pPkgHeader->pkgLen);                            //客户端指明的包宽度【包头+包体】
-	unsigned short pkglen = pPkgHeader->pkgLen;                            //客户端指明的包宽度【包头+包体】
+	unsigned short pkglen = pPkgHeader->bodysize;                            //客户端指明的包宽度【包体】,不含包头
 
-	if (m_iLenPkgHeader == pkglen)
-	{
-		//没有包体，只有包头
-		if (pPkgHeader->crc32 != 0) //只有包头的crc值给0
-		{
-			return; //crc错，直接丢弃
-		}
-		pPkgBody = NULL;
-	}
-	else
-	{
-		//有包体，走到这里
-		pPkgHeader->crc32 = ntohl(pPkgHeader->crc32);		          //针对4字节的数据，网络序转主机序
-		pPkgBody = (void*)(pMsgBuf + m_iLenMsgHeader + m_iLenPkgHeader); //跳过消息头 以及 包头 ，指向包体
+	//gyb 不校验
+	//if (m_iLenPkgHeader == pkglen)
+	//{
+	//	//没有包体，只有包头
+	//	if (pPkgHeader->crc32 != 0) //只有包头的crc值给0
+	//	{
+	//		return; //crc错，直接丢弃
+	//	}
+	//	pPkgBody = NULL;
+	//}
+	//else
+	//{
+	//	//有包体，走到这里
+	//	pPkgHeader->crc32 = ntohl(pPkgHeader->crc32);		          //针对4字节的数据，网络序转主机序
+	//	pPkgBody = (void*)(pMsgBuf + m_iLenMsgHeader + m_iLenPkgHeader); //跳过消息头 以及 包头 ，指向包体
 
-		//计算crc值判断包的完整性        
-		int calccrc = CCRC32::GetInstance()->Get_CRC((unsigned char*)pPkgBody, pkglen - m_iLenPkgHeader); //计算纯包体的crc值
-		if (calccrc != pPkgHeader->crc32) //服务器端根据包体计算crc值，和客户端传递过来的包头中的crc32信息比较
-		{
-			ngx_log_stderr(0, "CLogicSocket::threadRecvProcFunc()中CRC错误，丢弃数据!");    //正式代码中可以干掉这个信息
-			return; //crc错，直接丢弃
-		}
-	}
+	//	//计算crc值判断包的完整性        
+	//	int calccrc = CCRC32::GetInstance()->Get_CRC((unsigned char*)pPkgBody, pkglen - m_iLenPkgHeader); //计算纯包体的crc值
+	//	if (calccrc != pPkgHeader->crc32) //服务器端根据包体计算crc值，和客户端传递过来的包头中的crc32信息比较
+	//	{
+	//		ngx_log_stderr(0, "CLogicSocket::threadRecvProcFunc()中CRC错误，丢弃数据!");    //正式代码中可以干掉这个信息
+	//		return; //crc错，直接丢弃
+	//	}
+	//}
 
 	//包crc校验OK才能走到这里    	
 	//gyb
 	//unsigned short imsgCode = ntohs(pPkgHeader->msgCode); //消息代码拿出来
-	unsigned short imsgCode = pPkgHeader->msgCode; //消息代码拿出来
+	unsigned short imsgCode = pPkgHeader->id; //消息代码拿出来
 	lpngx_connection_t p_Conn = pMsgHeader->pConn;        //消息头中藏着连接池中连接的指针
 
 	//我们要做一些判断
@@ -237,5 +240,12 @@ bool CLogicSocket::_HandleRegister(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER 
 bool CLogicSocket::_HandleLogIn(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgBody, unsigned short iBodyLength)
 {
 	ngx_log_stderr(0, "执行了CLogicSocket::_HandleLogIn()!");
+	return true;
+}
+
+
+bool CLogicSocket::WriteQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgBody, unsigned short iBodyLength)
+{
+	ngx_log_stderr(0, "执行了CLogicSocket::WriteQ()!");
 	return true;
 }

@@ -24,6 +24,8 @@
 
 //本文件用的函数声明
 static void freeresource();
+//gyb
+static bool gplat_load_qbd();
 
 //和设置标题有关的全局量
 size_t  g_argvneedmem = 0;        //保存下这些argv参数所需要的内存大小
@@ -139,6 +141,14 @@ int main(int argc, char* const* argv)
 		g_daemonized = 1;    //守护进程标记，标记是否启用了守护进程模式，0：未启用，1：启用了
 	}
 
+	//gyb加载qbd
+	if (gplat_load_qbd() == false) //加载qbd
+	{
+		exitcode = 3;
+		goto lblexit;
+
+	}
+
 	//(7)开始正式的主工作流程，主流程一致在下边这个函数里循环，暂时不会走下来，资源释放啥的日后再慢慢完善和考虑    
 	ngx_master_process_cycle(); //不管父进程还是子进程，正常工作期间都在这个函数里循环；
 
@@ -174,4 +184,51 @@ void freeresource()
 		close(ngx_log.fd); //不用判断结果了
 		ngx_log.fd = -1; //标记下，防止被再次close吧        
 	}
+}
+
+//gyb
+#include <filesystem>
+#include <vector>
+#include <string>
+#include <iostream>
+#include "../include/higplat.h"
+
+namespace fs = std::filesystem;
+
+//gyb
+std::vector<std::string> getFilesInDirectory(const std::string& directoryPath) {
+	std::vector<std::string> files;
+
+	try {
+		for (const auto& entry : fs::directory_iterator(directoryPath)) {
+			if (entry.is_regular_file()) {
+				files.push_back(entry.path().filename().string());
+			}
+		}
+	}
+	catch (const fs::filesystem_error& e) {
+		std::cerr << "文件系统错误: " << e.what() << std::endl;
+	}
+
+	return files;
+}
+
+//gyb
+bool gplat_load_qbd()
+{
+	std::string directoryPath = "./qbdfile";
+
+	auto files = getFilesInDirectory(directoryPath);
+
+	std::cout << "目录 " << directoryPath << " 中的文件:" << std::endl;
+	for (const auto& file : files) {
+		std::cout << file << std::endl;
+
+		if (LoadQ(file.c_str()) == false) //把qbd文件内容载入到内存            
+		{
+			ngx_log_stderr(0, "文件[%s]载入失败，退出!", file.c_str());
+			return false;
+		}
+	}
+	return true;
 }

@@ -194,6 +194,7 @@ static void ngx_worker_process_cycle(int inum, const char* pprocname)
 		//ngx_log_stderr(0,"good--这是子进程，编号为%d,pid为%P",inum,ngx_pid); 
 		//ngx_log_error_core(0,0,"good--这是子进程，编号为%d,pid为%P",inum,ngx_pid);
 
+		//mark 目前无法优雅退出，因为ngx_process_events_and_timers()函数里边是无限超时等待（-1）
 		ngx_process_events_and_timers(); //处理网络事件和定时器事件
 
 		/*if(false) //优雅的退出

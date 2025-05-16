@@ -7,45 +7,44 @@
 
 #define DllImport   __declspec( dllimport )
 
-#define ERROR_DQFILE_NOT_FOUND			0x20000000L
-#define ERROR_DQ_NOT_OPEN				0x20000001L
-#define ERROR_DQ_EMPTY					0x20000002L
-#define ERROR_DQ_FULL					0x20000003L
-#define ERROR_FILENAME_TOO_LONG			0x20000004L
-#define ERROR_FILE_IN_USE				0x20000005L
-#define ERROR_FILE_CREATE_FAILSURE		0x20000006L
-#define ERROR_FILE_OPEN_FAILSURE		0x20000007L
-#define ERROR_CREATE_FILEMAPPINGOBJECT	0x20000008L
-#define ERROR_OPEN_FILEMAPPINGOBJECT	0x20000009L
-#define ERROR_MAPVIEWOFFILE				0x2000000AL
-#define ERROR_CREATE_MUTEX				0x2000000BL
-#define ERROR_OPEN_MUTEX				0x2000000CL
-#define ERROR_RECORDSIZE				0x2000000DL
-#define ERROR_STARTPOSITION				0x2000000EL
-#define ERROR_RECORD_ALREAD_EXIST		0x2000000FL
-#define ERROR_TABLE_OVERFLOW			0x20000010L
-#define ERROR_RECORD_NOT_EXIST			0x20000011L
-#define ERROR_OPERATE_PROHIBIT			0x20000012L
-#define ERROR_ALREADY_OPEN				0x20000013L
-#define ERROR_ALREADY_CLOSE				0x20000014L
-#define ERROR_ALREADY_LOAD				0x20000015L
-#define ERROR_ALREADY_UNLOAD			0x20000016L
-#define ERROR_NO_SPACE			        0x20000017L
-#define ERROR_TABLE_NOT_EXIST			0x20000018L
-#define ERROR_TABLE_ALREADY_EXIST		0x20000019L
-#define ERROR_TABLE_ROWID				0x2000001AL
-#define ERROR_ITEM_NOT_EXIST			0x2000001BL
-#define ERROR_ITEM_ALREADY_EXIST		0x2000001CL
-#define ERROR_ITEM_OVERFLOW				0x2000001DL
-#define ERROR_SOCKET_NOT_CONNECTED      0x2000001EL
-#define ERROR_MSGSIZE			        0x2000001FL
-#define ERROR_BUFFER_SIZE		        0x20000020L
-#define ERROR_PARAMETER_SIZE	        0x20000021L
-#define CODE_QEMPTY						0x20000022L
-#define CODE_QFULL						0x20000023L
-#define STRING_TOO_LONG					0x20000024L
-#define BUFFER_TOO_SMALL				0x20000025L
-#define ERROR_SEND_PIPE_MSG				0x20000026L
+#define ERROR_DQFILE_NOT_FOUND			1
+#define ERROR_DQ_NOT_OPEN				2
+#define ERROR_DQ_EMPTY					3
+#define ERROR_DQ_FULL					4
+#define ERROR_FILENAME_TOO_LONG			5
+#define ERROR_FILE_IN_USE				6
+#define ERROR_FILE_CREATE_FAILSURE		7
+#define ERROR_FILE_OPEN_FAILSURE		8
+#define ERROR_CREATE_FILEMAPPINGOBJECT	9
+#define ERROR_OPEN_FILEMAPPINGOBJECT	10
+#define ERROR_MAPVIEWOFFILE				11
+#define ERROR_CREATE_MUTEX				12
+#define ERROR_OPEN_MUTEX				13
+#define ERROR_RECORDSIZE				14
+#define ERROR_STARTPOSITION				15
+#define ERROR_RECORD_ALREAD_EXIST		16
+#define ERROR_TABLE_OVERFLOW			17
+#define ERROR_RECORD_NOT_EXIST			18
+#define ERROR_OPERATE_PROHIBIT			19
+#define ERROR_ALREADY_OPEN				20
+#define ERROR_ALREADY_CLOSE				21
+#define ERROR_ALREADY_LOAD				22
+#define ERROR_ALREADY_UNLOAD			23
+#define ERROR_NO_SPACE			        24
+#define ERROR_TABLE_NOT_EXIST			25
+#define ERROR_TABLE_ALREADY_EXIST		26
+#define ERROR_TABLE_ROWID				27
+#define ERROR_ITEM_NOT_EXIST			28
+#define ERROR_ITEM_ALREADY_EXIST		29
+#define ERROR_ITEM_OVERFLOW				30
+#define ERROR_SOCKET_NOT_CONNECTED      31
+#define ERROR_MSGSIZE			        32
+#define ERROR_BUFFER_SIZE		        33
+#define ERROR_PARAMETER_SIZE	        34
+#define CODE_QEMPTY						35
+#define CODE_QFULL						36
+#define STRING_TOO_LONG					37
+#define BUFFER_TOO_SMALL				38
 
 #define MAXDQNAMELENTH 40
 
@@ -147,6 +146,7 @@ struct DB_HEAD
 #define RECORDHEADSIZE  sizeof(RECORD_HEAD)
 
 extern "C" int connectgplat(const char* server, int port);
+extern "C" bool readq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error);
 extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error);
 //DllImport BOOL __cdecl GetQueuePath(LPTSTR lpPath, size_t count);
 //DllImport BOOL __cdecl CreateB(LPCTSTR  lpFileName, int size);
@@ -155,7 +155,7 @@ extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize,
 //DllImport BOOL __cdecl DeleteItem( LPCTSTR lpBoardName, LPCTSTR lpItemName );
 //DllImport BOOL __cdecl DeleteItem( HANDLE hServer, LPCTSTR lpBoardName, LPCTSTR lpItemName, DWORD * error );
 extern "C" bool CreateQ(const char* lpFileName, int recordSize, int recordNum, int dateType, int operateMode, void* pType = 0, int typeSize = 0);
-//DllImport BOOL __cdecl LoadQ( LPCTSTR  lpDqName );
+extern "C" bool LoadQ(const char* lpDqName );
 //DllImport BOOL __cdecl UnloadQ(void);
 //DllImport BOOL __cdecl UnloadQ(LPCTSTR  lpDqName);
 //DllImport BOOL __cdecl FlushQFile(void);
@@ -165,10 +165,10 @@ extern "C" bool CreateQ(const char* lpFileName, int recordSize, int recordNum, i
 //DllImport BOOL __cdecl CloseQ( LPCTSTR  lpDqName );
 //DllImport BOOL __cdecl CloseQ(void);
 //DllImport BOOL __cdecl ReadHead( LPCTSTR  lpDqName, VOID  *lpHead );
-//DllImport BOOL __cdecl ReadQ( LPCTSTR  lpDqName, VOID  *lpRecord, int actSize, LPTSTR remoteIp=0 );
+extern "C" bool ReadQ(const char* lpDqName, void  *lpRecord, int actSize, char* remoteIp=0 );
 //DllImport BOOL __cdecl MulReadQ( LPCTSTR lpDqName, VOID *lpRecord, int start, int *count, int *pRecordSize=0 );
 //DllImport BOOL __cdecl MulReadQ( LPCTSTR lpDqName, VOID  **lppRecords, int start, int *count, int *pRecordSize );
-//DllImport BOOL __cdecl WriteQ( LPCTSTR  lpDqName, VOID  *lpRecord, int actSize=0, LPCTSTR remoteIp=0 );
+extern "C" bool WriteQ(const char* lpDqName, void  *lpRecord, int actSize=0, const char* remoteIp=0 );
 //DllImport BOOL __cdecl Acknowledge( LPCTSTR  lpDqName, int index );
 //DllImport BOOL __cdecl Acknowledge( HANDLE hServer, LPCTSTR  lpDqName, int index, DWORD * error );
 //DllImport BOOL __cdecl SetPtrQ( LPCTSTR  lpDqName, int readPtr, int writePtr );

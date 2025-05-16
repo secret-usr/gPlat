@@ -4,13 +4,13 @@
 #include <unistd.h>     //sleep(1)
 #include <signal.h>
 
-#include "..//include//hello.h"
-#include "..//include//higplat.h"
-#include "..//include//qbdtype.h"
+#include "../include/hello.h"
+#include "../include/higplat.h"
+#include "../include/qbdtype.h"
 
 int main()
 {
-	//printf("size = %d\n", sizeof(MyStruct));
+	printf("size = %d\n", sizeof(MyStruct));
 
 	int conngplat;
 	conngplat = connectgplat("127.0.0.1", 8777);
@@ -18,9 +18,28 @@ int main()
 	MyStruct myStruct;
 	myStruct.a = 1;
 	myStruct.b = 2;
+	myStruct.c = 1.01;
 
 	unsigned int error;
-	writeq(conngplat, "MyStruct1", & myStruct, sizeof(myStruct), &error); // 发送数据
 
+	for (int i = 0; i < 10; i++)
+	{
+		myStruct.a++;
+		myStruct.b++;
+		myStruct.c++;
+
+		writeq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 发送数据
+
+		myStruct.a = 11;
+		myStruct.b = 22;
+		myStruct.c = 0;
+
+		readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
+
+		printf("接收数据：%d %d %f error=%d\n", myStruct.a, myStruct.b, myStruct.c, error);
+
+		sleep(1);
+	}
+	
     return 0;
 }

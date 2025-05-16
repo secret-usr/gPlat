@@ -120,7 +120,11 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>
       <AdditionalLibraryDirectories>$(RemoteRootDir)/$(Platform)/$(Configuration);%(Link.AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <LibraryDependencies>higplat</LibraryDependencies>
     </Link>
+    <ClCompile>
+      <CppLanguageStandard>c++17</CppLanguageStandard>
+    </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

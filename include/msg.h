@@ -3,9 +3,10 @@
 
 #define MAXMSGLEN 128000   //必须与qbd.h中的TYPEMAXSIZE一致? 与ngx_comm.h中的_DATA_BUFSIZE_一致
 
+//必须和ngx_c_slogic.cxx中statusHandler[]的下标对应上
 enum MSGID
 {
-	SUCCEED=1,
+	SUCCEED=5,
 	FAIL,
 	CONNECT,
 	RECONNECT,

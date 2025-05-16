@@ -61,6 +61,7 @@ int main(int argc, char* argv[])
 	if (CreateQ(lpname, size, number, type, mode))
 	{
 		printf("Queue \'%s\' created successfully!\n", lpname);
+		printf("size = %d, number = %d\n", size, number);
 		return 0;
 	}
 	printf("Create queue \'%s\' fail with error code %d\n", lpname, GetLastErrorQ());

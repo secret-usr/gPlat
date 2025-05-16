@@ -29,7 +29,9 @@
 #include "ngx_c_crc32.h"
 #include "ngx_c_slogic.h"  
 #include "ngx_logiccomm.h"  
-#include "ngx_c_lockmutex.h"  
+#include "ngx_c_lockmutex.h" 
+
+#include "../include/higplat.h"
 
 //定义成员函数指针
 typedef bool (CLogicSocket::* handler)(lpngx_connection_t pConn,      //连接池中连接的指针
@@ -37,7 +39,28 @@ typedef bool (CLogicSocket::* handler)(lpngx_connection_t pConn,      //连接�
 	char* pPkgBody,                 //包体指针
 	unsigned short iBodyLength);    //包体长度
 
+//gyb
 //用来保存 成员函数指针 的这么个数组
+//static const handler statusHandler[] =
+//{
+//	//数组前5个元素，保留，以备将来增加一些基本服务器功能
+//	NULL,                                                   //【0】：下标从0开始
+//	NULL,                                                   //【1】：下标从0开始
+//	NULL,                                                   //【2】：下标从0开始
+//	NULL,                                                   //【3】：下标从0开始
+//	NULL,                                                   //【4】：下标从0开始
+//
+//	//开始处理具体的业务逻辑
+//	&CLogicSocket::_HandleRegister,                         //【5】：实现具体的注册功能
+//	&CLogicSocket::_HandleLogIn,                            //【6】：实现具体的登录功能
+//	//......其他待扩展，比如实现攻击功能，实现加血功能等等；
+//	//gyb
+//	& CLogicSocket::WriteQ,									//【7】：实现具体的登录功能
+//
+//};
+
+//gyb
+//顺序必须和msg.h中的MSGID对应上
 static const handler statusHandler[] =
 {
 	//数组前5个元素，保留，以备将来增加一些基本服务器功能
@@ -48,13 +71,96 @@ static const handler statusHandler[] =
 	NULL,                                                   //【4】：下标从0开始
 
 	//开始处理具体的业务逻辑
-	&CLogicSocket::_HandleRegister,                         //【5】：实现具体的注册功能
-	&CLogicSocket::_HandleLogIn,                            //【6】：实现具体的登录功能
-	//......其他待扩展，比如实现攻击功能，实现加血功能等等；
-	//gyb
-	& CLogicSocket::WriteQ,									//【7】：实现具体的登录功能
-
+	//SUCCEED = 5,
+	&CLogicSocket::noop,
+	//FAIL,
+	&CLogicSocket::noop,
+	//CONNECT,
+	&CLogicSocket::noop,
+	//RECONNECT,
+	&CLogicSocket::noop,
+	//DISCONNECT,
+	&CLogicSocket::noop,
+	//OPEN,
+	&CLogicSocket::noop,
+	//OPENQ,        //OPENB
+	&CLogicSocket::noop,
+	//CLOSEQ,       //CLOSEB
+	&CLogicSocket::noop,
+	//CLEARQ,
+	&CLogicSocket::noop,
+	//ISEMPTYQ,
+	&CLogicSocket::noop,
+	//ISFULLQ,
+	&CLogicSocket::noop,
+	//READQ,
+	& CLogicSocket::HandleReadQ,
+	//PEEKQ,
+	&CLogicSocket::noop,
+	//WRITEQ,
+	 &CLogicSocket::HandleWriteQ,
+	 //READB,
+	 &CLogicSocket::noop,
+	 //READBSTRING,
+	 &CLogicSocket::noop,
+	 //WRITEB,
+	 &CLogicSocket::noop,
+	 //QDATA,
+	 &CLogicSocket::noop,
+	 //READHEAD,
+	 &CLogicSocket::noop,
+	 //MULREADQ,
+	 &CLogicSocket::noop,
+	 //SETPTRQ,
+	 &CLogicSocket::noop,
+	 //WATCHDOG,
+	 &CLogicSocket::noop,
+	 //SELECTTB,
+	 &CLogicSocket::noop,
+	 //CLEARTB,
+	 &CLogicSocket::noop,
+	 //INSERTTB,
+	 &CLogicSocket::noop,
+	 //REFRESHTB,
+	 &CLogicSocket::noop,
+	 //READTYPE,
+	 &CLogicSocket::noop,
+	 //CREATEITEM,
+	 &CLogicSocket::noop,
+	 //CREATETABLE,
+	 &CLogicSocket::noop,
+	 //DELETEITEM,
+	 &CLogicSocket::noop,
+	 //DELETETABLE,
+	 &CLogicSocket::noop,
+	 //READHEADB,
+	 &CLogicSocket::noop,
+	 //READHEADDB,
+	 &CLogicSocket::noop,
+	 //ACK,
+	 &CLogicSocket::noop,
+	 //POPARECORDQ,	//mark
+	 &CLogicSocket::noop,
+	 //WRITEBSTRING,	//mark
+	 &CLogicSocket::noop,
+	 //WRITETOL1,		//mark
+	 &CLogicSocket::noop,
+	 //SUBSCRIBE,		//mark
+	 &CLogicSocket::noop,
+	 //CANCELSUBSCRIBE,//mark
+	 &CLogicSocket::noop,
+	 //POST,			//mark
+	 &CLogicSocket::noop,
+	 //POSTWAIT,		//mark
+	 &CLogicSocket::noop,
+	 //PASSTOSERVER,	//mark 内部使用
+	 &CLogicSocket::noop,
+	 //CLEARB,			//mark
+	 &CLogicSocket::noop,
+	 //CLEARDB			//mark
+	 &CLogicSocket::noop,
 };
+
 #define AUTH_TOTAL_COMMANDS sizeof(statusHandler)/sizeof(handler) //整个命令有多少个，编译时即可知道
 
 //构造函数
@@ -146,7 +252,9 @@ void CLogicSocket::threadRecvProcFunc(char* pMsgBuf)
 
 	//一切正确，可以放心大胆的处理了
 	//(4)调用消息码对应的成员函数来处理
-	(this->*statusHandler[imsgCode])(p_Conn, pMsgHeader, (char*)pPkgBody, pkglen - m_iLenPkgHeader);
+	//gyb
+	//(this->*statusHandler[imsgCode])(p_Conn, pMsgHeader, (char*)pPkgBody, pkglen - m_iLenPkgHeader);
+	(this->*statusHandler[imsgCode])(p_Conn, pMsgHeader, (char*)pPkgHeader, pkglen);	//pkglen只是包体长度，不包含包头
 	return;
 }
 
@@ -237,15 +345,115 @@ bool CLogicSocket::_HandleRegister(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER 
 	//ngx_log_stderr(0,"执行了CLogicSocket::_HandleRegister()!");
 	return true;
 }
+
 bool CLogicSocket::_HandleLogIn(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgBody, unsigned short iBodyLength)
 {
 	ngx_log_stderr(0, "执行了CLogicSocket::_HandleLogIn()!");
 	return true;
 }
 
-
-bool CLogicSocket::WriteQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgBody, unsigned short iBodyLength)
+bool CLogicSocket::noop(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgBody, unsigned short iBodyLength)
 {
-	ngx_log_stderr(0, "执行了CLogicSocket::WriteQ()!");
+	ngx_log_stderr(0, "执行了CLogicSocket::noop()!");
+	return true;
+}
+
+bool CLogicSocket::HandleReadQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
+{
+	ngx_log_stderr(0, "执行了CLogicSocket::HandleReadQ()!");
+
+	//(1)首先判断包体的合法性
+	if (pPkgHeader == NULL) //具体看客户端服务器约定，如果约定这个命令[msgCode]必须带包体，那么如果不带包体，就认为是恶意包，直接不处理    
+	{
+		return false;
+	}
+
+	PMSGHEAD pMsgHead = (PMSGHEAD)pPkgHeader; //包头
+	bool ret;
+	char ip[16];
+	int iLenPkgBody = pMsgHead->datasize;
+	//直接分配内存返回数据
+	CMemory* p_memory = CMemory::GetInstance();
+	char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + iLenPkgBody, false);//准备发送的格式，这里是消息头+包头+包体
+	if (ret = ReadQ(pMsgHead->qname, p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader, iLenPkgBody, ip))
+	{
+		pMsgHead->error = 0;
+		strcpy(pMsgHead->ip, ip);
+	}
+	else
+	{
+		pMsgHead->error = GetLastErrorQ();
+	}
+
+	//mark 即使读取失败，也要返回一个包给客户端，而且包体的长度和用户申请的长度一致，这样用户读的时候就不会出错
+	pMsgHead->bodysize = pMsgHead->datasize;
+
+	//mark
+	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
+
+	//b)填充消息头
+	memcpy(p_sendbuf, pMsgHeader, m_iLenMsgHeader);           //消息头直接拷贝到这里来
+	//c)填充包头
+	PMSGHEAD pPkgHeader_;
+	pPkgHeader_ = (PMSGHEAD)(p_sendbuf + m_iLenMsgHeader);    //指向包头
+	memcpy(pPkgHeader_, pPkgHeader, m_iLenPkgHeader);         //包头直接拷贝到这里来
+	//c)填充包体
+	//这里不用了，上面ReadQ已经填充了包体
+
+	//f)发送数据包
+	msgSend(p_sendbuf);
+
+	return true;
+}
+
+bool CLogicSocket::HandleWriteQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
+{
+	ngx_log_stderr(0, "执行了CLogicSocket::HandleWriteQ()!");
+
+	//(1)首先判断包体的合法性
+	if (pPkgHeader == NULL) //具体看客户端服务器约定，如果约定这个命令[msgCode]必须带包体，那么如果不带包体，就认为是恶意包，直接不处理    
+	{
+		return false;
+	}
+
+	PMSGHEAD pMsg = (PMSGHEAD)pPkgHeader; //包头
+	bool ret;
+	//debug
+	char* data = (char*)pMsg + sizeof(MSGHEAD);
+	if (ret = WriteQ(pMsg->qname, (char*)pMsg + sizeof(MSGHEAD), pMsg->datasize))
+	{
+		pMsg->error = 0;
+	}
+	else
+	{
+		pMsg->error = GetLastErrorQ();
+	}
+
+	//mark
+	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
+
+	int iLenPkgBody = 0;
+	CMemory* p_memory = CMemory::GetInstance();
+	char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + iLenPkgBody, false);//准备发送的格式，这里是消息头+包头+包体
+	//b)填充消息头
+	memcpy(p_sendbuf, pMsgHeader, m_iLenMsgHeader);           //消息头直接拷贝到这里来
+	//c)填充包头
+	PMSGHEAD pPkgHeader_;
+	pPkgHeader_ = (PMSGHEAD)(p_sendbuf + m_iLenMsgHeader);    //指向包头
+	memcpy(pPkgHeader_, pPkgHeader, m_iLenPkgHeader);         //包头直接拷贝到这里来
+	pPkgHeader_->bodysize = 0;
+
+	//d)填充包体
+	LPSTRUCT_REGISTER p_sendInfo = (LPSTRUCT_REGISTER)(p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader);	//跳过消息头，跳过包头，就是包体了
+
+	//f)发送数据包
+	msgSend(p_sendbuf);
+
+	//发布订阅
+	if (ret)
+	{
+
+	}
+
 	return true;
 }

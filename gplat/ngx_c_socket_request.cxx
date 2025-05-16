@@ -31,6 +31,10 @@
 //来数据时候的处理，当连接上有数据来的时候，本函数会被ngx_epoll_process_events()所调用  ,官方的类似函数为ngx_http_wait_request_handler();
 void CSocekt::ngx_read_request_handler(lpngx_connection_t pConn)
 {
+	//debug
+	int recvlen = 0; //接收数据的长度，先给0，表示没收到数据；
+	recvlen = pConn->irecvlen; //要收的宽度
+
 	//收包，注意我们用的第二个和第三个参数，我们用的始终是这两个参数，因此我们必须保证 c->precvbuf指向正确的收包位置，保证c->irecvlen指向正确的收包宽度
 	ssize_t reco = recvproc(pConn, pConn->precvbuf, pConn->irecvlen);
 	if (reco <= 0)
@@ -209,7 +213,7 @@ void CSocekt::ngx_wait_request_handler_proc_p1(lpngx_connection_t pConn)
 
 		//gyb 这里难道不断开连接吗？还要继续收下一个包？还是说直接断开连接？我觉得应该断开连接，直接关闭socket，释放连接池中连接
 	}
-	else if (e_pkgLen > (_PKG_MAX_LENGTH - 1000))   //客户端发来包居然说包长度 > 29000?肯定是恶意包
+	else if (e_pkgLen > (_PKG_MAX_LENGTH - 1000))   //客户端发来包居然说包长度 > ?肯定是恶意包
 	{
 		//恶意包，太大，认定非法用户，废包【包头中说这个包总长度这么大，这不行】
 		//状态和接收位置都复原，这些值都有必要，因为有可能在其他状态比如_PKG_HD_RECVING状态调用这个函数；

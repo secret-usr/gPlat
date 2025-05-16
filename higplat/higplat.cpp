@@ -27,7 +27,7 @@
 namespace fs = std::filesystem;
 
 thread_local  unsigned int errorCode = 0;
-char dataQuePath[100];
+char dataQuePath[100] = ".//qbdfile//";
 struct TABLE_MSG table[TABLESIZE];
 int tabCounter = 0;
 std::mutex mutex_rw;
@@ -501,6 +501,71 @@ extern "C" int connectgplat(const char* server, int port)
 	}
 }
 
+extern "C" bool readq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error)
+{
+	bool   fSuccess = false;
+	int  cbBytesRead, cbWritten;
+	MSGSTRUCT     msg;
+
+	msg.head.id = READQ;
+	strcpy(msg.head.qname, qname);
+	msg.head.datasize = actsize;
+	msg.head.bodysize = 0;
+
+	if (msg.head.bodysize > MAXMSGLEN)
+	{
+		*error = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
+	{
+		fSuccess = true;
+	}
+
+	if (!fSuccess)
+	{
+		printf("send_all failed\n");
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+	else
+	{
+		// Read client requests.
+		cbBytesRead = readn(sockfd, &msg, sizeof(MSGHEAD));
+
+		if (cbBytesRead < 0)
+		{
+			printf("readn failed\n");
+			*error = errno;
+			close(sockfd);
+			return false;
+		}
+
+		if (msg.head.bodysize > 0)
+		{
+			cbBytesRead = readn(sockfd, msg.body, msg.head.bodysize);
+			if (cbBytesRead < 0)
+			{
+				printf("readn failed\n");
+				*error = errno;
+				close(sockfd);
+				return false;
+			}
+		}
+
+		*error = msg.head.error;
+		if (*error != 0)
+			return false;
+
+		printf("readq ok\n");
+		memcpy(record, msg.body, msg.head.bodysize);
+		return true;
+	}
+	return true;
+}
+
 extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error)
 {
 	bool   fSuccess = false;
@@ -511,6 +576,7 @@ extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize,
 	strcpy(msg.head.qname, qname);
 	msg.head.datasize = actsize;
 	msg.head.bodysize = actsize;
+
 	if (msg.head.bodysize > MAXMSGLEN)
 	{
 		*error = ERROR_PARAMETER_SIZE;
@@ -531,6 +597,7 @@ extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize,
 	
 	if (!fSuccess)
 	{
+		printf("send_all failed\n");
 		*error = errno;
 		close(sockfd);
 		return false;
@@ -542,6 +609,7 @@ extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize,
 
 		if (cbBytesRead < 0)
 		{
+			printf("readn failed\n");
 			*error = errno;
 			close(sockfd);
 			return false;
@@ -556,12 +624,6 @@ extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize,
 				close(sockfd);
 				return false;
 			}
-		}
-
-		if (cbBytesRead != sizeof(MSGHEAD) + msg.head.bodysize)
-		{
-			*error = ERROR_MSGSIZE;
-			return false;
 		}
 
 		*error = msg.head.error;
@@ -624,28 +686,13 @@ extern "C" bool CreateQ(const char* lpFileName,
 		}
 	}
 
-	// 创建文件
-	try {
-		// 创建父目录（如果不存在）
-		fs::path path(dqFileName);
-		if (path.has_parent_path() && !fs::exists(path.parent_path())) {
-			fs::create_directories(path.parent_path());
-		}
-
-		// 创建文件
-		std::ofstream newfile(dqFileName);
-		if (newfile.is_open()) {
-			newfile.close();
-		}
-		else {
+	// 创建父目录（如果不存在）
+	fs::path path(dqFileName);
+	if (path.has_parent_path() && !fs::exists(path.parent_path())) {
+		if (!fs::create_directories(path.parent_path())) {
 			errorCode = ERROR_FILE_CREATE_FAILSURE;
 			return false;
 		}
-	}
-	catch (const std::exception& e) {
-		std::cerr << "create file error: " << e.what() << std::endl;
-		errorCode = ERROR_FILE_CREATE_FAILSURE;
-		return false;
 	}
 
 	// 计算文件大小
@@ -667,7 +714,7 @@ extern "C" bool CreateQ(const char* lpFileName,
 	}
 
 	// 3. 内存映射文件
-	void* lpMapAddress = mmap(nullptr, fileSize, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+	void* lpMapAddress = mmap(nullptr, fileSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (lpMapAddress == MAP_FAILED) {
 		std::cerr << "内存映射失败: " << strerror(errno) << std::endl;
 		close(fd);
@@ -766,7 +813,7 @@ extern "C" bool LoadQ(const char* lpDqName)
 	off_t file_size = sb.st_size;
 
 	// 3. 创建内存映射
-	void* lpMapAddress = mmap(nullptr, file_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+	void* lpMapAddress = mmap(nullptr, file_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (lpMapAddress == MAP_FAILED) {
 		std::cerr << "内存映射失败: " << strerror(errno) << std::endl;
 		close(fd);
@@ -1611,28 +1658,13 @@ extern "C" bool CreateB(const char* lpFileName, int size)
 		}
 	}
 
-	// 创建文件
-	try {
-		// 创建父目录（如果不存在）
-		fs::path path(dqFileName);
-		if (path.has_parent_path() && !fs::exists(path.parent_path())) {
-			fs::create_directories(path.parent_path());
-		}
-
-		// 创建文件
-		std::ofstream newfile(dqFileName);
-		if (newfile.is_open()) {
-			newfile.close();
-		}
-		else {
+	// 创建父目录（如果不存在）
+	fs::path path(dqFileName);
+	if (path.has_parent_path() && !fs::exists(path.parent_path())) {
+		if (!fs::create_directories(path.parent_path())) {
 			errorCode = ERROR_FILE_CREATE_FAILSURE;
 			return false;
 		}
-	}
-	catch (const std::exception& e) {
-		std::cerr << "create file error: " << e.what() << std::endl;
-		errorCode = ERROR_FILE_CREATE_FAILSURE;
-		return false;
 	}
 
 	// 计算文件大小
@@ -1655,7 +1687,7 @@ extern "C" bool CreateB(const char* lpFileName, int size)
 	}
 
 	// 3. 内存映射文件
-	void* lpMapAddress = mmap(nullptr, fileSize, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+	void* lpMapAddress = mmap(nullptr, fileSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (lpMapAddress == MAP_FAILED) {
 		std::cerr << "内存映射失败: " << strerror(errno) << std::endl;
 		close(fd);

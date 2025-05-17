@@ -18,7 +18,7 @@
 //一个信号有关的结构 ngx_signal_t
 typedef struct
 {
-	int           signo;       //信号对应的数字编号 ，每个信号都有对应的#define ，大家已经学过了 
+	int           signo;     //信号对应的数字编号 ，每个信号都有对应的#define ，大家已经学过了 
 	const  char* signame;    //信号对应的中文名字 ，比如SIGHUP 
 
 	//信号处理函数,这个函数由我们自己来提供，但是它的参数和返回值是固定的【操作系统就这样要求】,大家写的时候就先这么写，也不用思考这么多；
@@ -67,14 +67,14 @@ int ngx_init_signals()
 		{
 			sa.sa_handler = SIG_IGN; //sa_handler:这个标记SIG_IGN给到sa_handler成员，表示忽略信号的处理程序，否则操作系统的缺省信号处理程序很可能把这个进程杀掉；
 			//其实sa_handler和sa_sigaction都是一个函数指针用来表示信号处理程序。只不过这两个函数指针他们参数不一样， sa_sigaction带的参数多，信息量大，
-			 //而sa_handler带的参数少，信息量少；如果你想用sa_sigaction，那么你就需要把sa_flags设置为SA_SIGINFO；                                       
+			//而sa_handler带的参数少，信息量少；如果你想用sa_sigaction，那么你就需要把sa_flags设置为SA_SIGINFO；                                       
 		} //end if
 
 		sigemptyset(&sa.sa_mask);   //比如咱们处理某个信号比如SIGUSR1信号时不希望收到SIGUSR2信号，那咱们就可以用诸如sigaddset(&sa.sa_mask,SIGUSR2);这样的语句针对信号为SIGUSR1时做处理，这个sigaddset三章五节讲过；
 		//这里.sa_mask是个信号集（描述信号的集合），用于表示要阻塞的信号，sigemptyset()这个函数咱们在第三章第五节讲过：把信号集中的所有信号清0，本意就是不准备阻塞任何信号；
 
 
-//设置信号处理动作(信号处理函数)，说白了这里就是让这个信号来了后调用我的处理程序，有个老的同类函数叫signal，不过signal这个函数被认为是不可靠信号语义，不建议使用，大家统一用sigaction
+		//设置信号处理动作(信号处理函数)，说白了这里就是让这个信号来了后调用我的处理程序，有个老的同类函数叫signal，不过signal这个函数被认为是不可靠信号语义，不建议使用，大家统一用sigaction
 		if (sigaction(sig->signo, &sa, NULL) == -1) //参数1：要操作的信号
 			//参数2：主要就是那个信号处理函数以及执行信号处理函数时候要屏蔽的信号等等内容
 			 //参数3：返回以往的对信号的处理方式【跟sigprocmask()函数边的第三个参数是的】，跟参数2同一个类型，我们这里不需要这个东西，所以直接设置为NULL；
@@ -97,8 +97,10 @@ static void ngx_signal_handler(int signo, siginfo_t* siginfo, void* ucontext)
 {
 	//printf("来信号了\n");    
 	ngx_signal_t* sig;    //自定义结构
+	//mark 目前action貌似没啥用
 	char* action; //一个字符串，用于记录一个动作字符串以往日志文件中写
 
+	//mark 这个for循环貌似没啥用
 	for (sig = signals; sig->signo != 0; sig++) //遍历信号数组    
 	{
 		//找到对应信号，即可处理
@@ -123,11 +125,17 @@ static void ngx_signal_handler(int signo, siginfo_t* siginfo, void* ucontext)
 		case SIGINT:  //SIGINT信号，表示中断进程的信号，通常是Ctrl+C产生的
 			ngx_log_stderr(0, "SIGINT signal received, please wait");
 			g_stopEvent = 1; //标记停止事件，表示要停止了
+			// 主进程通知子进程退出
+			write(sockpair[1], "x", 1);
+			close(sockpair[1]);
 			break;
 
 		case SIGTERM: //SIGTERM信号，表示终止进程的信号，通常是kill -15 pid 产生的
 			ngx_log_stderr(0, "SIGTERM signal received, please wait");
 			g_stopEvent = 1; //标记停止事件，表示要停止了
+			// 主进程通知子进程退出
+			write(sockpair[1], "x", 1);
+			close(sockpair[1]);
 			break;
 
 		default:

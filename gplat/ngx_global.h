@@ -45,4 +45,6 @@ extern int           ngx_process;
 extern sig_atomic_t  ngx_reap;   
 extern int           g_stopEvent;
 
+extern int sockpair[2]; //socketpair的文件描述符，父进程和子进程之间的通信管道
+
 #endif

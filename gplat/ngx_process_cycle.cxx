@@ -16,6 +16,8 @@
 #include "ngx_macro.h"
 #include "ngx_c_conf.h"
 
+#include "ngx_global.h"
+
 //函数声明
 static void ngx_start_worker_processes(int threadnums);
 static int ngx_spawn_process(int threadnums, const char* pprocname);
@@ -81,30 +83,26 @@ void ngx_master_process_cycle()
 	//创建子进程后，父进程的执行流程会返回到这里，子进程不会走进来    
 	sigemptyset(&set); //信号屏蔽字为空，表示不屏蔽任何信号
 
+	//gyb
+	close(sockpair[0]);  // 关闭不需要的一端
+
 	for (;; )
 	{
+		//ngx_log_error_core(0,0,"haha--这是父进程，pid为%P",ngx_pid);
 
-		//    usleep(100000);
-			//ngx_log_error_core(0,0,"haha--这是父进程，pid为%P",ngx_pid);
-
-			// sigsuspend(const sigset_t *mask))用于在接收到某个信号之前, 临时用mask替换进程的信号掩码, 并暂停进程执行，直到收到信号为止。
-			// sigsuspend 返回后将恢复调用之前的信号掩码。信号处理函数完成后，进程将继续执行。该系统调用始终返回-1，并将errno设置为EINTR。
-
-			//sigsuspend是一个原子操作，包含4个步骤：
-			//a)根据给定的参数设置新的mask 并 阻塞当前进程【因为是个空集，所以不阻塞任何信号】
-			//b)此时，一旦收到信号，便恢复原先的信号屏蔽【我们原来调用sigprocmask()的mask在上边设置的，阻塞了多达10个信号，从而保证我下边的执行流程不会再次被其他信号截断】
-			//c)调用该信号对应的信号处理函数
-			//d)信号处理函数返回后，sigsuspend返回，使程序流程继续往下走
-			//printf("for进来了！\n"); //发现，如果print不加\n，无法及时显示到屏幕上，是行缓存问题，以往没注意；可参考https://blog.csdn.net/qq_26093511/article/details/53255970
+		//sigsuspend是一个原子操作，包含4个步骤：
+		//a)根据给定的参数设置新的mask 并 阻塞当前进程【因为是个空集，所以不阻塞任何信号】
+		//b)此时，一旦收到信号，便恢复原先的信号屏蔽【我们原来调用sigprocmask()的mask在上边设置的，阻塞了多达10个信号，从而保证我下边的执行流程不会再次被其他信号截断】
+		//c)调用该信号对应的信号处理函数
+		//d)信号处理函数返回后，sigsuspend返回，使程序流程继续往下走
+		//printf("for进来了！\n"); //发现，如果print不加\n，无法及时显示到屏幕上，是行缓存问题，以往没注意；可参考https://blog.csdn.net/qq_26093511/article/details/53255970
 
 		sigsuspend(&set); //阻塞在这里，等待一个信号，此时进程是挂起的，不占用cpu时间，只有收到信号才会被唤醒（返回）；
 		//此时master进程完全靠信号驱动干活    
 
-//        printf("执行到sigsuspend()下边来了\n");
-
-		//printf("master进程休息1秒\n");      
-		//ngx_log_stderr(0,"haha--这是父进程，pid为%P",ngx_pid); 
-		sleep(1); //休息1秒        
+		//mark 为何要休息
+		//sleep(1); //休息1秒 
+		
 		//以后扩充.......
 
 	}// end for(;;)
@@ -165,43 +163,17 @@ static void ngx_worker_process_cycle(int inum, const char* pprocname)
 	ngx_setproctitle(pprocname); //设置标题   
 	ngx_log_error_core(NGX_LOG_NOTICE, 0, "%s %P 【worker进程】启动并开始运行......!", pprocname, ngx_pid); //设置标题时顺便记录下来进程名，进程id等信息到日志
 
-
-	//测试代码，测试线程池的关闭
-	//sleep(5); //休息5秒        
-	//g_threadpool.StopAll(); //测试Create()后立即释放的效果
-
 	//暂时先放个死循环，我们在这个循环里一直不出来
 	//setvbuf(stdout,NULL,_IONBF,0); //这个函数. 直接将printf缓冲区禁止， printf就直接输出了。
 	for (;;)
 	{
-
-		//先sleep一下 以后扩充.......
-		//printf("worker进程休息1秒");       
-		//fflush(stdout); //刷新标准输出缓冲区，把输出缓冲区里的东西打印到标准输出设备上，则printf里的东西会立即输出；
-		//sleep(1); //休息1秒       
-		//usleep(100000);
-		//ngx_log_error_core(0,0,"good--这是子进程，编号为%d,pid为%P！",inum,ngx_pid);
-		//printf("1212");
-		//if(inum == 1)
-		//{
-			//ngx_log_stderr(0,"good--这是子进程，编号为%d,pid为%P",inum,ngx_pid); 
-			//printf("good--这是子进程，编号为%d,pid为%d\r\n",inum,ngx_pid);
-			//ngx_log_error_core(0,0,"good--这是子进程，编号为%d",inum,ngx_pid);
-			//printf("我的测试哈inum=%d",inum++);
-			//fflush(stdout);
-		//}
-
-		//ngx_log_stderr(0,"good--这是子进程，编号为%d,pid为%P",inum,ngx_pid); 
-		//ngx_log_error_core(0,0,"good--这是子进程，编号为%d,pid为%P",inum,ngx_pid);
-
 		//mark 目前无法优雅退出，因为ngx_process_events_and_timers()函数里边是无限超时等待（-1）
 		ngx_process_events_and_timers(); //处理网络事件和定时器事件
 
-		/*if(false) //优雅的退出
+		if (g_stopEvent == 1) //优雅的退出
 		{
-			g_stopEvent = 1;
 			break;
-		}*/
+		}
 
 	} //end for(;;)
 
@@ -225,13 +197,14 @@ static void ngx_worker_process_init(int inum)
 	//线程池代码，率先创建，至少要比和socket相关的内容优先
 	CConfig* p_config = CConfig::GetInstance();
 	int tmpthreadnums = p_config->GetIntDefault("ProcMsgRecvWorkThreadCount", 5); //处理接收到的消息的线程池中线程数量
-	if (g_threadpool.Create(tmpthreadnums) == false)  //创建线程池中线程
+	if (g_threadpool.Create(tmpthreadnums) == false)  //创建线程池中线程,创建处理电文的线程
 	{
 		//内存没释放，但是简单粗暴退出；
 		exit(-2);
 	}
 	sleep(1); //再休息1秒；
 
+	//创建发送数据和回收连接的线程
 	if (g_socket.Initialize_subproc() == false) //初始化子进程需要具备的一些多线程能力相关的信息
 	{
 		//内存没释放，但是简单粗暴退出；

@@ -594,7 +594,7 @@ extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize,
 			fSuccess = false;
 		}
 	}
-	
+
 	if (!fSuccess)
 	{
 		printf("send_all failed\n");

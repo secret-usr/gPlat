@@ -26,6 +26,9 @@
 #include "ngx_c_memory.h"
 #include "ngx_c_lockmutex.h"
 
+//gyb 控制子进程退出的信号量
+extern int sockpair[2]; //socketpair的文件描述符，父进程和子进程之间的通信管道
+
 //--------------------------------------------------------------------------
 //构造函数
 CSocekt::CSocekt()
@@ -346,6 +349,15 @@ int CSocekt::ngx_epoll_init()
 		exit(2); //这是致命问题了，直接退，资源由系统释放吧，这里不刻意释放了，比较麻烦
 	}
 
+	// 将socketpair读端加入epoll
+	struct epoll_event ev;
+	ev.events = EPOLLIN;  // 监听可读事件
+	ev.data.fd = sockpair[0];
+	if (epoll_ctl(m_epollhandle, EPOLL_CTL_ADD, sockpair[0], &ev) == -1) {
+		perror("epoll_ctl");
+		exit(EXIT_FAILURE);
+	}
+
 	//(2)创建连接池【数组】、创建出来，这个东西后续用于处理所有客户端的连接
 	initconnection();
 	/*
@@ -606,6 +618,18 @@ int CSocekt::ngx_epoll_process_events(int timer)
 	uint32_t           revents;
 	for (int i = 0; i < events; ++i)    //遍历本次epoll_wait返回的所有事件，注意events才是返回的实际事件数量
 	{
+		if (m_events[i].data.fd == sockpair[0]) {
+			// 收到退出通知
+			ngx_log_stderr(0, "收到退出通知");
+			char buf;
+			read(sockpair[0], &buf, 1);  // 读取通知
+			close(sockpair[0]);
+			return 1; // 退出
+			//close(epfd);
+			//exit(EXIT_SUCCESS);
+		}
+		// 处理其他事件...
+
 		p_Conn = (lpngx_connection_t)(m_events[i].data.ptr);           //ngx_epoll_add_event()给进去的，这里能取出来
 
 		/*

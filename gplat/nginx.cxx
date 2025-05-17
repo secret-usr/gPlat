@@ -46,17 +46,24 @@ pid_t   ngx_parent;             //父进程的pid
 int     ngx_process;            //进程类型，比如master,worker进程等
 int     g_stopEvent;            //标志程序退出,0不退出1，退出
 
+//gyb 控制子进程退出的信号量
+int sockpair[2];
+
 sig_atomic_t  ngx_reap;         //标记子进程状态变化[一般是子进程发来SIGCHLD信号表示退出],sig_atomic_t:系统定义的类型：访问或改变这些变量需要在计算机的一条指令内完成
 //一般等价于int【通常情况下，int类型的变量通常是原子访问的，也可以认为 sig_atomic_t就是int类型的数据】                                   
 
 //程序主入口函数----------------------------------
 int main(int argc, char* const* argv)
 {
-	//printf("%u,%u,%u",EPOLLERR ,EPOLLHUP,EPOLLRDHUP);  
-	//exit(0);
-
 	int exitcode = 0;           //退出代码，先给0表示正常退出
-	int i;                      //临时用
+	int i;
+
+	int ret;
+	ret = socketpair(AF_UNIX, SOCK_STREAM, 0, sockpair);
+	if (ret != 0) {
+		perror("socketpair");
+		return 1;
+	}
 
 	//(0)先初始化的变量
 	g_stopEvent = 0;            //标记程序是否退出，0不退出          

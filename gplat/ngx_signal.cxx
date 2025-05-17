@@ -116,10 +116,19 @@ static void ngx_signal_handler(int signo, siginfo_t* siginfo, void* ucontext)
 		switch (signo)
 		{
 		case SIGCHLD:  //一般子进程退出会收到该信号
+			ngx_log_stderr(0, "SIGCHLD signal received");
 			ngx_reap = 1;  //标记子进程状态变化，日后master主进程的for(;;)循环中可能会用到这个变量【比如重新产生一个子进程】
 			break;
 
-			//.....其他信号处理以后待增加
+		case SIGINT:  //SIGINT信号，表示中断进程的信号，通常是Ctrl+C产生的
+			ngx_log_stderr(0, "SIGINT signal received, please wait");
+			g_stopEvent = 1; //标记停止事件，表示要停止了
+			break;
+
+		case SIGTERM: //SIGTERM信号，表示终止进程的信号，通常是kill -15 pid 产生的
+			ngx_log_stderr(0, "SIGTERM signal received, please wait");
+			g_stopEvent = 1; //标记停止事件，表示要停止了
+			break;
 
 		default:
 			break;

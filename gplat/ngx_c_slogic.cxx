@@ -368,25 +368,25 @@ bool CLogicSocket::HandleReadQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsg
 		return false;
 	}
 
-	PMSGHEAD pMsgHead = (PMSGHEAD)pPkgHeader; //包头
+	PPKGHEAD pPkgHead = (PPKGHEAD)pPkgHeader; //包头
 	bool ret;
 	char ip[16];
-	int iLenPkgBody = pMsgHead->datasize;
+	int iLenPkgBody = pPkgHead->datasize;
 	//直接分配内存返回数据
 	CMemory* p_memory = CMemory::GetInstance();
 	char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + iLenPkgBody, false);//准备发送的格式，这里是消息头+包头+包体
-	if (ret = ReadQ(pMsgHead->qname, p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader, iLenPkgBody, ip))
+	if (ret = ReadQ(pPkgHead->qname, p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader, iLenPkgBody, ip))
 	{
-		pMsgHead->error = 0;
-		strcpy(pMsgHead->ip, ip);
+		pPkgHead->error = 0;
+		strcpy(pPkgHead->ip, ip);
 	}
 	else
 	{
-		pMsgHead->error = GetLastErrorQ();
+		pPkgHead->error = GetLastErrorQ();
 	}
 
 	//mark 即使读取失败，也要返回一个包给客户端，而且包体的长度和用户申请的长度一致，这样用户读的时候就不会出错
-	pMsgHead->bodysize = pMsgHead->datasize;
+	pPkgHead->bodysize = pPkgHead->datasize;
 
 	//mark
 	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
@@ -394,9 +394,7 @@ bool CLogicSocket::HandleReadQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsg
 	//b)填充消息头
 	memcpy(p_sendbuf, pMsgHeader, m_iLenMsgHeader);           //消息头直接拷贝到这里来
 	//c)填充包头
-	PMSGHEAD pPkgHeader_;
-	pPkgHeader_ = (PMSGHEAD)(p_sendbuf + m_iLenMsgHeader);    //指向包头
-	memcpy(pPkgHeader_, pPkgHeader, m_iLenPkgHeader);         //包头直接拷贝到这里来
+	memcpy(p_sendbuf + m_iLenMsgHeader, pPkgHeader, m_iLenPkgHeader);         //包头直接拷贝到这里来
 	//c)填充包体
 	//这里不用了，上面ReadQ已经填充了包体
 
@@ -416,18 +414,20 @@ bool CLogicSocket::HandleWriteQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 		return false;
 	}
 
-	PMSGHEAD pMsg = (PMSGHEAD)pPkgHeader; //包头
+	PPKGHEAD pPkgHead = (PPKGHEAD)pPkgHeader; //包头
 	bool ret;
 	//debug
-	char* data = (char*)pMsg + sizeof(MSGHEAD);
-	if (ret = WriteQ(pMsg->qname, (char*)pMsg + sizeof(MSGHEAD), pMsg->datasize))
+	char* data = (char*)pPkgHead + sizeof(PKGHEAD);
+	if (ret = WriteQ(pPkgHead->qname, (char*)pPkgHead + sizeof(PKGHEAD), pPkgHead->datasize))
 	{
-		pMsg->error = 0;
+		pPkgHead->error = 0;
 	}
 	else
 	{
-		pMsg->error = GetLastErrorQ();
+		pPkgHead->error = GetLastErrorQ();
 	}
+
+	pPkgHead->bodysize = 0;
 
 	//mark
 	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
@@ -438,10 +438,7 @@ bool CLogicSocket::HandleWriteQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	//b)填充消息头
 	memcpy(p_sendbuf, pMsgHeader, m_iLenMsgHeader);           //消息头直接拷贝到这里来
 	//c)填充包头
-	PMSGHEAD pPkgHeader_;
-	pPkgHeader_ = (PMSGHEAD)(p_sendbuf + m_iLenMsgHeader);    //指向包头
-	memcpy(pPkgHeader_, pPkgHeader, m_iLenPkgHeader);         //包头直接拷贝到这里来
-	pPkgHeader_->bodysize = 0;
+	memcpy(p_sendbuf + m_iLenMsgHeader, pPkgHeader, m_iLenPkgHeader);         //包头直接拷贝到这里来
 
 	//d)填充包体
 	LPSTRUCT_REGISTER p_sendInfo = (LPSTRUCT_REGISTER)(p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader);	//跳过消息头，跳过包头，就是包体了

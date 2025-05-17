@@ -77,6 +77,9 @@ typedef struct {
 	int    eventarg;
 } MSGHEAD, * PMSGHEAD;
 
+typedef MSGHEAD PKGHEAD;
+typedef MSGHEAD* PPKGHEAD;
+
 typedef struct {
 	MSGHEAD head;
 	char    body[MAXMSGLEN];

@@ -38,7 +38,8 @@ int main()
 
 		printf("接收数据：%d %d %f error=%d\n", myStruct.a, myStruct.b, myStruct.c, error);
 
-		sleep(1);
+		//sleep(0.5);
+		std::this_thread::sleep_for(std::chrono::milliseconds(500));
 	}
 	
     return 0;

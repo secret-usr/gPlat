@@ -70,7 +70,10 @@ void ngx_connection_s::PutOneToFree()
 		psendMemPointer = NULL;
 	}
 
-	iThrowsendCount = 0;                              //设置不设置感觉都行         
+	iThrowsendCount = 0;                              //设置不设置感觉都行 
+
+	//gyb
+	this->ClearTagList();
 }
 
 //---------------------------------------------------------------
@@ -198,29 +201,6 @@ void CSocekt::ngx_free_connection(lpngx_connection_t pConn)
 	//空闲连接数+1
 	++m_free_connection_n;
 
-	/*
-	if(c->precvMemPointer != NULL)
-	{
-		//我们曾经给这个连接分配过内存，则要释放内存
-		CMemory::GetInstance()->FreeMemory(c->precvMemPointer);
-		c->precvMemPointer = NULL;
-		//c->ifnewrecvMem = false;  //这行有用？
-	}
-	if(c->psendMemPointer != NULL) //如果发送数据的缓冲区里有内容，则要释放内存
-	{
-		CMemory::GetInstance()->FreeMemory(c->psendMemPointer);
-		c->psendMemPointer = NULL;
-	}
-
-	c->next = m_pfree_connections;                       //回收的节点指向原来串起来的空闲链的链头
-
-	//节点本身也要干一些事
-	++c->iCurrsequence;                                  //回收后，该值就增加1,以用于判断某些网络事件是否过期【一被释放就立即+1也是有必要的】
-	c->iThrowsendCount = 0;                              //设置不设置感觉都行
-
-	m_pfree_connections = c;                             //修改 原来的链头使链头指向新节点
-	++m_free_connection_n;                               //空闲连接多1
-	*/
 	return;
 }
 

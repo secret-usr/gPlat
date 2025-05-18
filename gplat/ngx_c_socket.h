@@ -10,6 +10,7 @@
 #include <semaphore.h>  //信号量 
 #include <atomic>       //c++11里的原子操作
 
+#include <string>      //string
 #include "ngx_comm.h"
 
 //一些宏定义放在这里-----------------------------------------------------------
@@ -80,6 +81,25 @@ struct ngx_connection_s
 
 	//--------------------------------------------------
 	lpngx_connection_t        next;                           //这是个指针，指向下一个本类型对象，用于把空闲的连接池对象串起来构成一个单向链表，方便取用
+
+	//gyb
+	//获取订阅事件列表
+	const std::list<std::string>& GetTagList()
+	{
+		return m_listTag;
+	}
+
+	const void ClearTagList()
+	{
+		m_listTag.clear();
+	}
+
+	void Attach(std::string tagname)
+	{
+		m_listTag.push_back(tagname);
+	}
+private:
+	std::list<std::string> m_listTag;	// 订阅的TAG列表
 };
 
 //消息头，引入的目的是当收到数据包时，额外记录一些内容以备将来使用

@@ -617,13 +617,142 @@ extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize,
 
 		if (msg.head.bodysize > 0)
 		{
+			printf("error: 应答电文不可能有电文体\n");
+			close(sockfd);
+			return false;
+		}
+
+		*error = msg.head.error;
+		if (*error != 0)
+			return false;
+	}
+	return true;
+}
+
+extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error, timespec* timestamp)
+{
+	bool   fSuccess = false;
+	int  cbBytesRead, cbWritten;
+	MSGSTRUCT     msg;
+
+	msg.head.id = READB;
+	strcpy(msg.head.qname, "BOARD");
+	strcpy(msg.head.itemname, tagname);
+	msg.head.datasize = actsize;
+	msg.head.bodysize = 0;
+
+	if (msg.head.bodysize > MAXMSGLEN)
+	{
+		*error = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
+	{
+		fSuccess = true;
+	}
+
+	if (!fSuccess)
+	{
+		printf("send_all failed\n");
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+	else
+	{
+		// Read client requests.
+		cbBytesRead = readn(sockfd, &msg, sizeof(MSGHEAD));
+
+		if (cbBytesRead < 0)
+		{
+			printf("readn failed\n");
+			*error = errno;
+			close(sockfd);
+			return false;
+		}
+
+		if (msg.head.bodysize > 0)
+		{
 			cbBytesRead = readn(sockfd, msg.body, msg.head.bodysize);
 			if (cbBytesRead < 0)
 			{
+				printf("readn failed\n");
 				*error = errno;
 				close(sockfd);
 				return false;
 			}
+		}
+
+		*error = msg.head.error;
+		if (*error != 0)
+			return false;
+
+		printf("readq ok\n");
+		memcpy(value, msg.body, msg.head.bodysize);
+		if (timestamp != 0) *timestamp = msg.head.timestamp;
+		return true;
+	}
+	return true;
+}
+
+extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize, int offset, int subsize, unsigned int* error)
+{
+	bool   fSuccess = false;
+	int  cbBytesRead, cbWritten;
+	MSGSTRUCT     msg;
+
+	msg.head.id = WRITEB;
+	strcpy(msg.head.qname, "BOARD");
+	strcpy(msg.head.itemname, tagname);
+	msg.head.datasize = actsize;
+	msg.head.bodysize = actsize;
+	msg.head.offset = offset;
+	msg.head.subsize = subsize;
+
+	if (msg.head.bodysize > MAXMSGLEN)
+	{
+		*error = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
+	{
+		if (send_all(sockfd, value, actsize) > 0)
+		{
+			fSuccess = true;
+		}
+		else
+		{
+			fSuccess = false;
+		}
+	}
+
+	if (!fSuccess)
+	{
+		printf("send_all failed\n");
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+	else
+	{
+		// Read client requests.
+		cbBytesRead = readn(sockfd, &msg, sizeof(MSGHEAD));
+
+		if (cbBytesRead < 0)
+		{
+			printf("readn failed\n");
+			*error = errno;
+			close(sockfd);
+			return false;
+		}
+
+		if (msg.head.bodysize > 0)
+		{
+			printf("error: 应答电文不可能有电文体\n");
+			close(sockfd);
+			return false;
 		}
 
 		*error = msg.head.error;

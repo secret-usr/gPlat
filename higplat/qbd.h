@@ -56,9 +56,9 @@ enum{
 };
 #define MUTEXSIZE	  64	// 一个BOARD或DB中读写锁的数量，必须是2的n次幂 mark，必须和dataqueue.h中的定义一致
 #define TABLESIZE     277	// 必须为质数
-#define INDEXSIZE     9973	// 必须为质数，必须和dataqueue.h中的定义一致
+#define INDEXSIZE     7177 	// 必须为质数，必须和higplat.h中的定义一致
 #define TYPEMAXSIZE   2048  // 数据类型的最大序列化长度   必须与msg.h中的MAXMSGLEN一致	//mark 与QbdServer项目中MyIOCP::HandleSUBSCRIBE里的缓冲区大小有矛盾，似乎没必要那么大
-#define TYPEAVGSIZE	  128	// 数据类型的平均序列化长度	mark
+#define TYPEAVGSIZE	  32	// 数据类型的平均序列化长度	mark
 
 #pragma pack( push, enter_dq_h_, 8)
 

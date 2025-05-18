@@ -1,7 +1,6 @@
 #if !defined(HIGPLAT_H_INCLUDED_)
 #define HIGPLAT_H_INCLUDED_
 
-//由于time_t类型在VS.net中默认是64位，VC是32位，所以必须在VS中定义预处理器_USE_32BIT_TIME_T，以便LIB文件可在VC和VS中通用
 #include <chrono>
 #include <mutex>
 
@@ -48,7 +47,7 @@
 
 #define MAXDQNAMELENTH 40
 
-#define INDEXSIZE     9973	// 必须为质数，必须和dq.h中的定义一致
+#define INDEXSIZE     7177 	// 必须为质数，必须和dq.h中的定义一致
 
 #define MUTEXSIZE	  64	// 一个BOARD或DB中读写锁的数量，必须是2的n次幂，必须和dq.h中的定义一致
 
@@ -148,8 +147,11 @@ struct DB_HEAD
 extern "C" int connectgplat(const char* server, int port);
 extern "C" bool readq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error);
 extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error);
+extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error, timespec* timestamp = 0);
+extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize, int offset, int subsize, unsigned int* error);
+
 //DllImport BOOL __cdecl GetQueuePath(LPTSTR lpPath, size_t count);
-//DllImport BOOL __cdecl CreateB(LPCTSTR  lpFileName, int size);
+extern "C" bool CreateB(const char* lpFileName, int size);
 //DllImport BOOL __cdecl CreateItem( LPCTSTR lpBoardName, LPCTSTR lpItemName, int itemSize, VOID * pType=0, int typeSize=0 );
 //DllImport BOOL __cdecl CreateItem( HANDLE hServer, LPCTSTR lpBoardName, LPCTSTR lpItemName, int itemSize, VOID * pType, int typeFileSize, DWORD * error );
 //DllImport BOOL __cdecl DeleteItem( LPCTSTR lpBoardName, LPCTSTR lpItemName );
@@ -189,11 +191,11 @@ extern "C" bool WriteQ(const char* lpDqName, void  *lpRecord, int actSize=0, con
 //DllImport BOOL __cdecl LockB( LPCTSTR lpBulletinName );
 //DllImport BOOL __cdecl UnlockB( LPCTSTR lpBulletinName );
 //DllImport BOOL __cdecl ReadInfoB( LPCTSTR lpBulletinName, int* pTotalSize, int* pDataSize, int* pLeftSize, int* pItemNumint, int* buffSize, TCHAR ppBuff[][24]);
-//DllImport BOOL __cdecl ReadB( LPCTSTR lpBoardName, LPCTSTR lpItemName, VOID  *lpItem, int actSize, time_t *timestamp=0 );
+extern "C" bool ReadB(const char* lpBoardName, const char* lpItemName, void* lpItem, int actSize, timespec* timestamp = 0);
 //DllImport BOOL __cdecl ReadB_String(LPCTSTR lpBulletinName, LPCTSTR lpItemName, VOID  *lpItem, int actSize, time_t *timestamp=0);
 //DllImport BOOL __cdecl ReadB_String(HANDLE hServer, LPCTSTR lpBulletinName, LPCTSTR lpItemName, VOID  *lpItem, int actSize, DWORD * error, time_t *timestamp=0);
 //DllImport BOOL __cdecl ReadB( VOID * pBulletin, LPCTSTR lpItemName, VOID  *lpItem, int actSize, time_t *timestamp=0 );
-//DllImport BOOL __cdecl WriteB( LPCTSTR lpBulletinName, LPCTSTR lpItemName, VOID  *lpItem, int actSize, VOID  *lpSubItem=0, int actSubSize=0 );
+extern "C" bool WriteB(const char* lpBulletinName, const char* lpItemName, void* lpItem, int actSize, void* lpSubItem = 0, int actSubSize = 0);
 //DllImport BOOL __cdecl WriteB_String(LPCTSTR lpBulletinName, LPCTSTR lpItemName, VOID  *lpItem, int actSize, VOID  *lpSubItem = 0, int actSubSize = 0);
 //DllImport BOOL __cdecl WriteB_String(HANDLE hServer, LPCTSTR lpBulletinName, LPCTSTR lpItemName, VOID  *lpItem, int actSize, DWORD * error);
 //DllImport BOOL __cdecl WriteB_ReadBack( LPCTSTR lpBulletinName, LPCTSTR lpItemName, VOID  *lpItem, int actSize, VOID  *lpSubItem=0, int actSubSize=0 );

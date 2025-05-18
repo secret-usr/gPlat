@@ -170,6 +170,8 @@ void CSocekt::Shutdown_subproc()
 	pthread_mutex_destroy(&m_sendMessageQueueMutex);    //发消息互斥量释放    
 	pthread_mutex_destroy(&m_recyconnqueueMutex);       //连接回收队列相关的互斥量释放
 	sem_destroy(&m_semEventSendQueue);                  //发消息相关线程信号量释放
+
+	ngx_log_stderr(0, "CSocekt::Shutdown_subproc()成功返回，线程池中线程全部正常结束!");
 }
 
 //清理TCP发送消息队列
@@ -620,10 +622,11 @@ int CSocekt::ngx_epoll_process_events(int timer)
 	{
 		if (m_events[i].data.fd == sockpair[0]) {
 			// 收到退出通知
-			ngx_log_stderr(0, "收到退出通知");
+			ngx_log_stderr(0, "收到主进程退出通知");
 			char buf;
 			read(sockpair[0], &buf, 1);  // 读取通知
 			close(sockpair[0]);
+			g_stopEventChild = 1; // 设置退出标志，通知线程退出
 			return 1; // 退出
 			//close(epfd);
 			//exit(EXIT_SUCCESS);
@@ -746,7 +749,7 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 
 	CMemory* p_memory = CMemory::GetInstance();
 
-	while (g_stopEvent == 0) //不退出
+	while (g_stopEventChild == 0) //不退出
 	{
 		//如果信号量值>0，则 -1(减1) 并走下去，否则卡这里卡着【为了让信号量值+1，可以在其他线程调用sem_post达到，实际上在CSocekt::msgSend()调用sem_post就达到了让这里sem_wait走下去的目的】
 		//******如果被某个信号中断，sem_wait也可能过早的返回，错误为EINTR；
@@ -759,7 +762,7 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 		}
 
 		//一般走到这里都表示需要处理数据收发了
-		if (g_stopEvent != 0)  //要求整个进程退出
+		if (g_stopEventChild != 0)  //要求整个进程退出
 			break;
 
 		if (pSocketObj->m_iSendMsgQueueCount > 0) //原子的 

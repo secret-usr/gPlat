@@ -44,9 +44,12 @@ CThreadPool    g_threadpool;    //线程池全局对象
 pid_t   ngx_pid;                //当前进程的pid
 pid_t   ngx_parent;             //父进程的pid
 int     ngx_process;            //进程类型，比如master,worker进程等
-int     g_stopEvent;            //标志程序退出,0不退出1，退出
+//gyb
+//int     g_stopEvent;            //标志程序退出,0不退出1，退出
+int     g_stopEventChild;         //子进程退出标志,0不退出1，退出
+int     g_stopEventMain;          //主程序退出标志,0不退出1，退出
 
-//gyb 控制子进程退出的信号量
+//gyb 控制子进程退出的socketpair
 int sockpair[2];
 
 sig_atomic_t  ngx_reap;         //标记子进程状态变化[一般是子进程发来SIGCHLD信号表示退出],sig_atomic_t:系统定义的类型：访问或改变这些变量需要在计算机的一条指令内完成
@@ -58,6 +61,7 @@ int main(int argc, char* const* argv)
 	int exitcode = 0;           //退出代码，先给0表示正常退出
 	int i;
 
+	//gyb 控制子进程退出的socketpair
 	int ret;
 	ret = socketpair(AF_UNIX, SOCK_STREAM, 0, sockpair);
 	if (ret != 0) {
@@ -65,11 +69,19 @@ int main(int argc, char* const* argv)
 		return 1;
 	}
 
+	//gyb加载qbd
+	if (gplat_load_qbd() == false) //加载qbd
+	{
+		printf("加载qbd失败，退出!\n");
+		return 1;
+	}
+
 	//(0)先初始化的变量
-	g_stopEvent = 0;            //标记程序是否退出，0不退出          
+	g_stopEventChild = 0;            //标记子进程是否退出，0不退出
+	g_stopEventMain  = 0;            //标记主进程是否退出，0不退出
 
 	//(1)无伤大雅也不需要释放的放最上边    
-	ngx_pid = getpid();      //取得进程pid
+	ngx_pid = getpid();			//取得进程pid
 	ngx_parent = getppid();     //取得父进程的id 
 	//统计argv所占的内存
 	g_argvneedmem = 0;
@@ -148,25 +160,9 @@ int main(int argc, char* const* argv)
 		g_daemonized = 1;    //守护进程标记，标记是否启用了守护进程模式，0：未启用，1：启用了
 	}
 
-	//gyb加载qbd
-	if (gplat_load_qbd() == false) //加载qbd
-	{
-		exitcode = 3;
-		goto lblexit;
-
-	}
-
 	//(7)开始正式的主工作流程，主流程一致在下边这个函数里循环，暂时不会走下来，资源释放啥的日后再慢慢完善和考虑    
 	ngx_master_process_cycle(); //不管父进程还是子进程，正常工作期间都在这个函数里循环；
 
-	//--------------------------------------------------------------    
-	//for(;;)    
-	//{
-	//    sleep(1); //休息1秒        
-	//    printf("休息1秒\n");        
-	//}
-
-	//--------------------------------------
 lblexit:
 	//(5)该释放的资源要释放掉
 	ngx_log_stderr(0, "程序退出，再见了!");

@@ -124,7 +124,6 @@ static void ngx_signal_handler(int signo, siginfo_t* siginfo, void* ucontext)
 
 		case SIGINT:  //SIGINT信号，表示中断进程的信号，通常是Ctrl+C产生的
 			ngx_log_stderr(0, "SIGINT signal received, please wait");
-			g_stopEvent = 1; //标记停止事件，表示要停止了
 			// 主进程通知子进程退出
 			write(sockpair[1], "x", 1);
 			close(sockpair[1]);
@@ -132,7 +131,6 @@ static void ngx_signal_handler(int signo, siginfo_t* siginfo, void* ucontext)
 
 		case SIGTERM: //SIGTERM信号，表示终止进程的信号，通常是kill -15 pid 产生的
 			ngx_log_stderr(0, "SIGTERM signal received, please wait");
-			g_stopEvent = 1; //标记停止事件，表示要停止了
 			// 主进程通知子进程退出
 			write(sockpair[1], "x", 1);
 			close(sockpair[1]);
@@ -171,6 +169,9 @@ static void ngx_signal_handler(int signo, siginfo_t* siginfo, void* ucontext)
 	if (signo == SIGCHLD)
 	{
 		ngx_process_get_status(); //获取子进程的结束状态
+
+		//gyb
+		g_stopEventMain = 1; //通知主进程退出
 	} //end if
 
 	return;

@@ -103,7 +103,12 @@ void ngx_master_process_cycle()
 		//mark 为何要休息
 		//sleep(1); //休息1秒 
 		
-		//以后扩充.......
+		//子进程退出了，发送SIGCHLD信号给父进程，父进程信号处理函数将g_stopEventMain置1，父进程也要退出
+		if (g_stopEventMain == 1)
+		{
+			ngx_log_stderr(0,"主进程跳出无限循环！");
+			break;
+		}
 
 	}// end for(;;)
 	return;
@@ -139,6 +144,10 @@ static int ngx_spawn_process(int inum, const char* pprocname)
 		ngx_parent = ngx_pid;              //因为是子进程了，所有原来的pid变成了父pid
 		ngx_pid = getpid();                //重新获取pid,即本子进程的pid
 		ngx_worker_process_cycle(inum, pprocname);    //我希望所有worker子进程，在这个函数里不断循环着不出来，也就是说，子进程流程不往下边走;
+
+		//如果子进程走到这里，说明ngx_worker_process_cycle()函数里边的循环跳出来了，直接退出子进程
+		ngx_log_stderr(0, "子进程退出了");
+		exit(0); //子进程退出，返回值为0；
 		break;
 
 	default: //这个应该是父进程分支，直接break;，流程往switch之后走            
@@ -155,6 +164,9 @@ static int ngx_spawn_process(int inum, const char* pprocname)
 //inum：进程编号【0开始】
 static void ngx_worker_process_cycle(int inum, const char* pprocname)
 {
+	//gyb
+	close(sockpair[1]);  // 关闭不需要的一端
+
 	//设置一下变量
 	ngx_process = NGX_PROCESS_WORKER;  //设置进程的类型，是worker进程
 
@@ -170,8 +182,9 @@ static void ngx_worker_process_cycle(int inum, const char* pprocname)
 		//mark 目前无法优雅退出，因为ngx_process_events_and_timers()函数里边是无限超时等待（-1）
 		ngx_process_events_and_timers(); //处理网络事件和定时器事件
 
-		if (g_stopEvent == 1) //优雅的退出
+		if (g_stopEventChild == 1) //优雅的退出
 		{
+			ngx_log_stderr(0,"子进程主线程跳出无限循环！");
 			break;
 		}
 

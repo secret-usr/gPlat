@@ -148,7 +148,7 @@ extern "C" int connectgplat(const char* server, int port);
 extern "C" bool readq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error);
 extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error);
 extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error, timespec* timestamp = 0);
-extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize, int offset, int subsize, unsigned int* error);
+extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error);
 
 //DllImport BOOL __cdecl GetQueuePath(LPTSTR lpPath, size_t count);
 extern "C" bool CreateB(const char* lpFileName, int size);

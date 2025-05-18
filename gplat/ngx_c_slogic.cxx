@@ -519,7 +519,7 @@ bool CLogicSocket::HandleWriteB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	bool ret;
 	//debug
 	char* data = (char*)pPkgHead + sizeof(PKGHEAD);
-	if (ret = WriteQ(pPkgHead->qname, (char*)pPkgHead + sizeof(PKGHEAD), pPkgHead->datasize))
+	if (ret = WriteB(pPkgHead->qname, pPkgHead->itemname, (char*)pPkgHead + sizeof(PKGHEAD), pPkgHead->datasize))
 	{
 		pPkgHead->error = 0;
 	}
@@ -550,7 +550,7 @@ bool CLogicSocket::HandleWriteB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	//发布订阅
 	if (ret)
 	{
-
+		NotifySubscriber(pPkgHead->itemname, pPkgHeader, iBodyLength);
 	}
 
 	return true;
@@ -558,4 +558,92 @@ bool CLogicSocket::HandleWriteB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 
 void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader, unsigned short iBodyLength)
 {
+	std::list<EventNode> subscribers = m_subscriber.GetSubscriber(tagName);
+
+	int usernumber = (int)subscribers.size();
+
+	if (usernumber > 500)
+	{
+		ngx_log_stderr(0, "ERROR:可能产生了事件风暴，请检查应用程序");
+		exit(1);
+	}
+
+	if (usernumber > 0)
+	{
+		ngx_log_stderr(0, "%s:usernumber=%d\n", tagName.c_str(), usernumber);
+		for (auto subscriber : subscribers)
+		{
+			CMemory* p_memory = CMemory::GetInstance();
+			char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader, false);//准备发送的格式，这里是消息头+包头
+			//b)填充消息头
+			//a)先填写消息头内容
+			LPSTRUC_MSG_HEADER ptmpMsgHeader = (LPSTRUC_MSG_HEADER)p_sendbuf;
+			lpngx_connection_t pConn = (lpngx_connection_t)(subscriber.subscriber);
+			ptmpMsgHeader->pConn = pConn;
+			ptmpMsgHeader->iCurrsequence = ptmpMsgHeader->pConn->iCurrsequence;
+			//c)填充包头
+			memcpy(p_sendbuf + m_iLenMsgHeader, pPkgHeader, m_iLenPkgHeader);         //包头直接拷贝到这里来
+			PPKGHEAD pPkgHead = (PPKGHEAD)pPkgHeader; //包头
+			pPkgHead->id = POST;	//发布事件
+
+			CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
+
+			switch (subscriber.eventid)
+			{
+			case EVENTID::DEFAULT:
+				//SendMsg((ClientContext*)subscriber.subscriber, pOverlapBuff);
+				msgSend(p_sendbuf);
+				break;
+	//		case EVENTID::POST_DELAY:
+	//			NotifySubscriberOnDelayTime(subscriber.eventname, subscriber.eventarg, (ClientContext*)subscriber.subscriber, pOverlapBuff);
+	//			break;
+			/*
+			case EVENTID::NOT_EQUAL_ZERO:
+				value = *(SHORT*)pMsg->body;
+				if (value != 0)
+				{
+					TCHAR itemname[32];
+					wcscpy_s(itemname, pMsg->head.itemname);
+					wcscpy_s(pMsg->head.itemname, subscriber.eventname);	//换成用户定义的事件名
+					SendMsg((ClientContext*)subscriber.subscriber, pOverlapBuff);
+					wcscpy_s(pMsg->head.itemname, itemname);				//还原			
+				}
+				else
+					pOverlapBuff->DecRef();
+				break;
+			case EVENTID::NOT_EQUAL_ZERO | EVENTID::POST_DELAY:
+				value = *(SHORT*)pMsg->body;
+				if (value != 0)
+					NotifySubscriberOnDelayTime(subscriber.eventname, subscriber.eventarg, (ClientContext*)subscriber.subscriber, pOverlapBuff);
+				else
+					pOverlapBuff->DecRef();
+				break;
+			case EVENTID::EQUAL_ZERO:
+				value = *(SHORT*)pMsg->body;
+				if (value == 0)
+				{
+					TCHAR itemname[32];
+					wcscpy_s(itemname, pMsg->head.itemname);
+					wcscpy_s(pMsg->head.itemname, subscriber.eventname);	//换成用户定义的事件名
+					SendMsg((ClientContext*)subscriber.subscriber, pOverlapBuff);
+					wcscpy_s(pMsg->head.itemname, itemname);				//还原			
+				}
+				else
+					pOverlapBuff->DecRef();
+				break;
+			case EVENTID::EQUAL_ZERO | EVENTID::POST_DELAY:
+				value = *(SHORT*)pMsg->body;
+				if (value == 0)
+					NotifySubscriberOnDelayTime(subscriber.eventname, subscriber.eventarg, (ClientContext*)subscriber.subscriber, pOverlapBuff);
+				else
+					pOverlapBuff->DecRef();
+				break;
+			*/
+			default:
+				//pOverlapBuff->DecRef();
+				p_memory->FreeMemory(p_sendbuf);	//释放内存
+				break;
+			}
+		}
+	}
 }

@@ -5,6 +5,8 @@
 #include <sys/socket.h>
 #include "ngx_c_socket.h"
 
+#include "CSubscribe.h"
+
 //处理逻辑和通讯的子类
 class CLogicSocket : public CSocekt   //继承自父类CScoekt
 {
@@ -29,6 +31,9 @@ public:
 
 public:
 	virtual void threadRecvProcFunc(char *pMsgBuf);
+
+//gyb
+	CSubscribe m_subscriber;
 };
 
 #endif

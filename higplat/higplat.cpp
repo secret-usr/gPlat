@@ -26,6 +26,14 @@
 
 namespace fs = std::filesystem;
 
+enum EVENTID
+{
+	DEFAULT = 1,
+	POST_DELAY = 2,
+	NOT_EQUAL_ZERO = 4,
+	EQUAL_ZERO = 8,
+};
+
 thread_local  unsigned int errorCode = 0;
 char dataQuePath[100] = ".//qbdfile//";
 struct TABLE_MSG table[TABLESIZE];
@@ -696,7 +704,7 @@ extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize,
 	return true;
 }
 
-extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize, int offset, int subsize, unsigned int* error)
+extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error)
 {
 	bool   fSuccess = false;
 	int  cbBytesRead, cbWritten;
@@ -707,8 +715,8 @@ extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize
 	strcpy(msg.head.itemname, tagname);
 	msg.head.datasize = actsize;
 	msg.head.bodysize = actsize;
-	msg.head.offset = offset;
-	msg.head.subsize = subsize;
+	msg.head.offset = 0;
+	msg.head.subsize = 0;
 
 	if (msg.head.bodysize > MAXMSGLEN)
 	{
@@ -726,6 +734,58 @@ extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize
 		{
 			fSuccess = false;
 		}
+	}
+
+	if (!fSuccess)
+	{
+		printf("send_all failed\n");
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+	else
+	{
+		// Read client requests.
+		cbBytesRead = readn(sockfd, &msg, sizeof(MSGHEAD));
+
+		if (cbBytesRead < 0)
+		{
+			printf("readn failed\n");
+			*error = errno;
+			close(sockfd);
+			return false;
+		}
+
+		if (msg.head.bodysize > 0)
+		{
+			printf("error: 应答电文不可能有电文体\n");
+			close(sockfd);
+			return false;
+		}
+
+		*error = msg.head.error;
+		if (*error != 0)
+			return false;
+	}
+	return true;
+}
+
+extern "C" bool subscribe(int sockfd, const char* tagname, unsigned int* error)
+{
+	bool   fSuccess = false;
+	int  cbBytesRead, cbWritten;
+	MSGSTRUCT     msg;
+
+	msg.head.id = SUBSCRIBE;
+	strcpy(msg.head.itemname, tagname);
+	strcpy(msg.head.qname, tagname);		//用qname字段保存用户定义的事件名！
+	msg.head.eventid = EVENTID::DEFAULT;
+	msg.head.eventarg = 0;
+	msg.head.bodysize = 0;
+
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
+	{
+		fSuccess = true;
 	}
 
 	if (!fSuccess)

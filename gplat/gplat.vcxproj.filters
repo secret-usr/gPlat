@@ -56,6 +56,7 @@
     <ClCompile Include="ngx_c_threadpool.cxx">
       <Filter>nginx</Filter>
     </ClCompile>
+    <ClCompile Include="CSubscribe.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="nginx">
@@ -105,5 +106,6 @@
     <ClInclude Include="ngx_logiccomm.h">
       <Filter>nginx_h</Filter>
     </ClInclude>
+    <ClInclude Include="CSubscribe.h" />
   </ItemGroup>
 </Project>

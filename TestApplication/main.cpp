@@ -22,6 +22,17 @@ int main()
 
 	unsigned int error;
 
+	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
+	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
+	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
+	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
+	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
+	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
+	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
+	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
+	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
+	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
+
 	for (int i = 0; i < 10; i++)
 	{
 		myStruct.a++;

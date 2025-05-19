@@ -822,6 +822,71 @@ extern "C" bool subscribe(int sockfd, const char* tagname, unsigned int* error)
 	return true;
 }
 
+extern "C" bool createtag(int sockfd, const char* tagname, int tagsize, void* type, int typesize, unsigned int* error)
+{
+	bool   fSuccess = false;
+	int  cbBytesRead, cbWritten;
+	MSGSTRUCT     msg;
+
+	msg.head.id = CREATEITEM;
+	msg.head.recsize = tagsize;
+	strcpy(msg.head.qname, "BOARD");
+	strcpy(msg.head.itemname, tagname);
+	msg.head.bodysize = typesize;
+
+	//mark 权宜之计，不支持复合类型
+	if (typesize > 8)
+	{
+		*error = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
+	{
+		if (send_all(sockfd, type, typesize) > 0)
+		{
+			fSuccess = true;
+		}
+		else
+		{
+			fSuccess = false;
+		}
+	}
+
+	if (!fSuccess)
+	{
+		printf("send_all failed\n");
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+	else
+	{
+		// Read client requests.
+		cbBytesRead = readn(sockfd, &msg, sizeof(MSGHEAD));
+
+		if (cbBytesRead < 0)
+		{
+			printf("readn failed\n");
+			*error = errno;
+			close(sockfd);
+			return false;
+		}
+
+		if (msg.head.bodysize > 0)
+		{
+			printf("error: 应答电文不可能有电文体\n");
+			close(sockfd);
+			return false;
+		}
+
+		*error = msg.head.error;
+		if (*error != 0)
+			return false;
+	}
+	return true;
+}
+
 /*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
 Function: CreateQ
 
@@ -3145,3 +3210,120 @@ extern "C" bool ClearDB(const char* lpDbName)
 	return true;
 }
 
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: CreateItem
+
+Summary:  Create item in Board.
+
+Args:     LPCTSTR lpDBName
+database name
+LPCTSTR lpItemName
+item name to be writen
+VOID  *lpItem
+item buffer pointer
+int actSize
+item size
+int offset
+item offset
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool CreateItem(const char* lpBoardName, const char* lpItemName, int itemSize, void* pType, int typeSize)
+{
+	//mark 最好区分这两种错误
+	//msg.h中定义了define MAXMSGLEN 2048，而DataQueue.cpp中的大量函数会检查读写的TAG是否超出此长度
+	//为了创建和读写超出此长度的字符串，将DataQueue.cpp中CreateItem里的大小检查注释，在qbd.cpp里控制创建非字符串TAG的大小
+	//如何突破MAXMSGLEN=2048的限制，需要后面细细斟酌
+	//if (itemSize > MAXMSGLEN || typeSize > TYPEMAXSIZE)
+	if (typeSize > TYPEMAXSIZE)
+	{
+		errorCode = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+
+	// Search bulletin in hash table.
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpBoardName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	BOARD_HEAD* pHead;
+	BOARD_INDEX_STRUCT* pIndex;
+	pHead = (BOARD_HEAD*)lpMapAddress;
+	pIndex = pHead->index;
+
+	//WaitForSingleObject(hMutex, INFINITE);
+	std::unique_lock<std::mutex> lock(*tabmsg.pmutex_rw);
+
+	// search table in board index(hash table)
+	int loc, c, loc_s, c_s;
+	loc = hash1(lpItemName);
+	c = hash2(lpItemName);
+	loc_s = loc, c_s = c;
+	while (strcmp(pIndex[loc].itemname, "\0") && strcmp(pIndex[loc].itemname, lpItemName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (strcmp(pIndex[loc].itemname, lpItemName) == 0 && pIndex[loc].erased == false)
+	{
+		errorCode = ERROR_ITEM_ALREADY_EXIST;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	// no enough remained space
+	if (pHead->remain < itemSize)
+	{
+		errorCode = ERROR_NO_SPACE;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	loc = loc_s;
+	c = c_s;
+	while (strcmp(pIndex[loc].itemname, "\0") && !pIndex[loc].erased)
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (pHead->indexcount == INDEXSIZE - 1)
+	{
+		errorCode = ERROR_ITEM_OVERFLOW;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	pHead->indexcount++;
+	strcpy(pIndex[loc].itemname, lpItemName);
+	pIndex[loc].itemsize = itemSize;
+	pIndex[loc].startpos = pHead->nextpos;
+	pIndex[loc].erased = false;
+	pHead->nextpos += itemSize;
+	pHead->remain -= itemSize;
+	//_time64(&pIndex[loc].timestamp);
+	clock_gettime(CLOCK_REALTIME, &pIndex[loc].timestamp);
+	//mark
+	if (pType != 0 && typeSize != 0 && typeSize < TYPEMAXSIZE && typeSize < pHead->typeremain)
+	{
+		//mark
+		memcpy((char*)lpMapAddress + pHead->totalsize + pHead->nexttypepos,
+			pType,
+			typeSize
+		);
+		pIndex[loc].typesize = typeSize;
+		pIndex[loc].typeaddr = pHead->nexttypepos;
+		pHead->nexttypepos += typeSize;
+		pHead->typeremain -= typeSize;
+	}
+	else
+	{
+		pIndex[loc].typesize = 0;
+	}
+	//ReleaseMutex(hMutex);
+	return true;
+}

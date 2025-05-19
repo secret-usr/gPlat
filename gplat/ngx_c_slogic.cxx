@@ -126,7 +126,7 @@ static const handler statusHandler[] =
 	 //READTYPE,
 	 &CLogicSocket::noop,
 	 //CREATEITEM,
-	 &CLogicSocket::noop,
+	 &CLogicSocket::HandleCreateItem,
 	 //CREATETABLE,
 	 &CLogicSocket::noop,
 	 //DELETEITEM,
@@ -691,4 +691,47 @@ void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader, unsig
 			}
 		}
 	}
+}
+
+bool CLogicSocket::HandleCreateItem(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
+{
+	ngx_log_stderr(0, "执行了CLogicSocket::HandleCreateItem()!");
+
+	//(1)首先判断包体的合法性
+	if (pPkgHeader == NULL) //具体看客户端服务器约定，如果约定这个命令[msgCode]必须带包体，那么如果不带包体，就认为是恶意包，直接不处理    
+	{
+		return false;
+	}
+
+	PPKGHEAD pPkgHead = (PPKGHEAD)pPkgHeader; //包头
+	bool ret;
+	if (ret = CreateItem(pPkgHead->qname, pPkgHead->itemname, pPkgHead->recsize, (char*)pPkgHead + sizeof(PKGHEAD), pPkgHead->bodysize))
+	{
+		pPkgHead->error = 0;
+	}
+	else
+	{
+		pPkgHead->error = GetLastErrorQ();
+	}
+
+	pPkgHead->bodysize = 0;
+
+	//mark
+	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
+
+	int iLenPkgBody = 0;
+	CMemory* p_memory = CMemory::GetInstance();
+	char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + iLenPkgBody, false);//准备发送的格式，这里是消息头+包头+包体
+	//b)填充消息头
+	memcpy(p_sendbuf, pMsgHeader, m_iLenMsgHeader);           //消息头直接拷贝到这里来
+	//c)填充包头
+	memcpy(p_sendbuf + m_iLenMsgHeader, pPkgHeader, m_iLenPkgHeader);         //包头直接拷贝到这里来
+
+	//d)填充包体
+	LPSTRUCT_REGISTER p_sendInfo = (LPSTRUCT_REGISTER)(p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader);	//跳过消息头，跳过包头，就是包体了
+
+	//f)发送数据包
+	msgSend(p_sendbuf);
+
+	return true;
 }

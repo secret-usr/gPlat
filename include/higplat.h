@@ -150,9 +150,11 @@ extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize,
 extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error, timespec* timestamp = 0);
 extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error);
 extern "C" bool subscribe(int sockfd, const char* tagname, unsigned int* error);
+extern "C" bool createtag(int sockfd, const char* tagname, int tagsize, void* type, int typesize, unsigned int* error);
+
 //DllImport BOOL __cdecl GetQueuePath(LPTSTR lpPath, size_t count);
 extern "C" bool CreateB(const char* lpFileName, int size);
-//DllImport BOOL __cdecl CreateItem( LPCTSTR lpBoardName, LPCTSTR lpItemName, int itemSize, VOID * pType=0, int typeSize=0 );
+extern "C" bool CreateItem(const char* lpBoardName, const char* lpItemName, int itemSize, void* pType = 0, int typeSize = 0);
 //DllImport BOOL __cdecl CreateItem( HANDLE hServer, LPCTSTR lpBoardName, LPCTSTR lpItemName, int itemSize, VOID * pType, int typeFileSize, DWORD * error );
 //DllImport BOOL __cdecl DeleteItem( LPCTSTR lpBoardName, LPCTSTR lpItemName );
 //DllImport BOOL __cdecl DeleteItem( HANDLE hServer, LPCTSTR lpBoardName, LPCTSTR lpItemName, DWORD * error );

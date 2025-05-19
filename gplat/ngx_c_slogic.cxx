@@ -146,7 +146,7 @@ static const handler statusHandler[] =
 	 //WRITETOL1,		//mark
 	 &CLogicSocket::noop,
 	 //SUBSCRIBE,		//mark
-	 &CLogicSocket::noop,
+	 &CLogicSocket::HandleSubscribe,
 	 //CANCELSUBSCRIBE,//mark
 	 &CLogicSocket::noop,
 	 //POST,			//mark
@@ -552,6 +552,51 @@ bool CLogicSocket::HandleWriteB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	{
 		NotifySubscriber(pPkgHead->itemname, pPkgHeader, iBodyLength);
 	}
+
+	return true;
+}
+
+bool CLogicSocket::HandleSubscribe(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
+{
+	//这个函数和windows平台区别是不返回TAG类型的大小
+
+	ngx_log_stderr(0, "执行了CLogicSocket::HandleSubscribe()!");
+
+	//(1)首先判断包体的合法性
+	if (pPkgHeader == NULL) //具体看客户端服务器约定，如果约定这个命令[msgCode]必须带包体，那么如果不带包体，就认为是恶意包，直接不处理    
+	{
+		return false;
+	}
+
+	PPKGHEAD pPkgHead = (PPKGHEAD)pPkgHeader; //包头
+	pConn->Attach(pPkgHead->itemname);
+
+	EventNode eventnode;
+	eventnode.subscriber = pConn;
+	eventnode.eventid = (EVENTID)(pPkgHead->eventid);
+	eventnode.eventarg = pPkgHead->eventarg;
+	strcpy(eventnode.eventname, pPkgHead->qname);	//用qname字段保存用户定义的事件名！
+	m_subscriber.Attach(pPkgHead->itemname, eventnode);
+
+	pPkgHead->error = 0;
+	pPkgHead->bodysize = 0;
+
+	//mark
+	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
+
+	int iLenPkgBody = 0;
+	CMemory* p_memory = CMemory::GetInstance();
+	char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + iLenPkgBody, false);//准备发送的格式，这里是消息头+包头+包体
+	//b)填充消息头
+	memcpy(p_sendbuf, pMsgHeader, m_iLenMsgHeader);           //消息头直接拷贝到这里来
+	//c)填充包头
+	memcpy(p_sendbuf + m_iLenMsgHeader, pPkgHeader, m_iLenPkgHeader);         //包头直接拷贝到这里来
+
+	//d)填充包体
+	LPSTRUCT_REGISTER p_sendInfo = (LPSTRUCT_REGISTER)(p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader);	//跳过消息头，跳过包头，就是包体了
+
+	//f)发送数据包
+	msgSend(p_sendbuf);
 
 	return true;
 }

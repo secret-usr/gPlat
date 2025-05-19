@@ -149,7 +149,7 @@ extern "C" bool readq(int sockfd, const char* qname, void* record, int actsize, 
 extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error);
 extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error, timespec* timestamp = 0);
 extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error);
-
+extern "C" bool subscribe(int sockfd, const char* tagname, unsigned int* error);
 //DllImport BOOL __cdecl GetQueuePath(LPTSTR lpPath, size_t count);
 extern "C" bool CreateB(const char* lpFileName, int size);
 //DllImport BOOL __cdecl CreateItem( LPCTSTR lpBoardName, LPCTSTR lpItemName, int itemSize, VOID * pType=0, int typeSize=0 );
@@ -304,7 +304,6 @@ extern "C" bool GetLastErrorQ();
 //DllImport BOOL __cdecl ReadType( HANDLE hServer, LPCTSTR  lpDqName, LPCTSTR lpItemName, VOID  *inBuff, int buffSize, int *pTypeSize, DWORD * error );
 //DllImport BOOL __cdecl ReadType( LPCTSTR  lpServerName, LPCTSTR  lpDqName, LPCTSTR lpItemName, VOID  *inBuff, int buffSize, int *pTypeSize, DWORD * error );
 //DllImport BOOL __cdecl CancelSubscribe(HANDLE hServer, DWORD * error);
-//DllImport BOOL __cdecl Subscribe(HANDLE hServer, LPCTSTR  lpTagName, DWORD * error);
 //DllImport BOOL __cdecl Subscribe(HANDLE hServer, LPCTSTR lpTagName, VOID** lppType, int& typeSize, DWORD* error);
 //DllImport BOOL __cdecl SubscribeForDelayPost(HANDLE hServer, LPCTSTR lpTagName, LPCTSTR lpEventName, int delayDueTime, DWORD * error);
 //DllImport BOOL __cdecl SubscribeForRisingEdge(HANDLE hServer, LPCTSTR lpTagName, LPCTSTR lpEventName, DWORD * error);

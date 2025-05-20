@@ -32,6 +32,7 @@
 #include "ngx_c_lockmutex.h" 
 
 #include "../include/higplat.h"
+#include <iostream>
 
 //定义成员函数指针
 typedef bool (CLogicSocket::* handler)(lpngx_connection_t pConn,      //连接池中连接的指针
@@ -461,7 +462,8 @@ bool CLogicSocket::HandleWriteQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 
 bool CLogicSocket::HandleReadB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
 {
-	ngx_log_stderr(0, "执行了CLogicSocket::HandleReadB()!");
+	//debug
+	//ngx_log_stderr(0, "执行了CLogicSocket::HandleReadB()!");
 
 	//(1)首先判断包体的合法性
 	if (pPkgHeader == NULL) //具体看客户端服务器约定，如果约定这个命令[msgCode]必须带包体，那么如果不带包体，就认为是恶意包，直接不处理    
@@ -477,6 +479,8 @@ bool CLogicSocket::HandleReadB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsg
 	//直接分配内存返回数据
 	CMemory* p_memory = CMemory::GetInstance();
 	char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + iLenPkgBody, false);//准备发送的格式，这里是消息头+包头+包体
+	//debug
+	//auto start = std::chrono::high_resolution_clock::now();
 	if (ret = ReadB(pPkgHead->qname, pPkgHead->itemname, p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader, iLenPkgBody, &timestamp))
 	{
 		pPkgHead->error = 0;
@@ -502,12 +506,18 @@ bool CLogicSocket::HandleReadB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsg
 	//f)发送数据包
 	msgSend(p_sendbuf);
 
+	//debug
+	//auto end = std::chrono::high_resolution_clock::now();
+	//auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+	//std::cout << "ReadB执行时间: " << duration.count() << " 微秒" << std::endl;
+
 	return true;
 }
 
 bool CLogicSocket::HandleWriteB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
 {
-	ngx_log_stderr(0, "执行了CLogicSocket::HandleWriteB()!");
+	//debug
+	//ngx_log_stderr(0, "执行了CLogicSocket::HandleWriteB()!");
 
 	//(1)首先判断包体的合法性
 	if (pPkgHeader == NULL) //具体看客户端服务器约定，如果约定这个命令[msgCode]必须带包体，那么如果不带包体，就认为是恶意包，直接不处理    
@@ -518,7 +528,7 @@ bool CLogicSocket::HandleWriteB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	PPKGHEAD pPkgHead = (PPKGHEAD)pPkgHeader; //包头
 	bool ret;
 	//debug
-	char* data = (char*)pPkgHead + sizeof(PKGHEAD);
+	//auto start = std::chrono::high_resolution_clock::now();
 	if (ret = WriteB(pPkgHead->qname, pPkgHead->itemname, (char*)pPkgHead + sizeof(PKGHEAD), pPkgHead->datasize))
 	{
 		pPkgHead->error = 0;
@@ -527,7 +537,7 @@ bool CLogicSocket::HandleWriteB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	{
 		pPkgHead->error = GetLastErrorQ();
 	}
-
+	
 	pPkgHead->bodysize = 0;
 
 	//mark
@@ -547,10 +557,16 @@ bool CLogicSocket::HandleWriteB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	//f)发送数据包
 	msgSend(p_sendbuf);
 
+	//debug
+	//auto end = std::chrono::high_resolution_clock::now();
+	//auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+	//std::cout << "WriteB执行时间: " << duration.count() << " 微秒" << std::endl;
+
 	//发布订阅
 	if (ret)
 	{
-		NotifySubscriber(pPkgHead->itemname, pPkgHeader, iBodyLength);
+		//debug
+		//NotifySubscriber(pPkgHead->itemname, pPkgHeader, iBodyLength);
 	}
 
 	return true;

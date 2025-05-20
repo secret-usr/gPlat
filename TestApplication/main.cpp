@@ -7,6 +7,7 @@
 #include "../include/hello.h"
 #include "../include/higplat.h"
 #include "../include/qbdtype.h"
+#include <iostream>
 
 int main()
 {
@@ -17,8 +18,10 @@ int main()
 
 	MyStruct myStruct;
 	myStruct.a = 1;
-	myStruct.b = 2;
-	myStruct.c = 1.01;
+	myStruct.b = 1;
+	myStruct.c = 1.999;
+
+	int a = 777;
 
 	unsigned int error;
 
@@ -33,25 +36,46 @@ int main()
 	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
 	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
 
-	for (int i = 0; i < 10; i++)
+	auto start = std::chrono::high_resolution_clock::now();
+	
+	for (int i = 0; i < 5; i++)
 	{
 		myStruct.a++;
 		myStruct.b++;
 		myStruct.c++;
 
-		writeq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 发送数据
+		//writeq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 发送数据
+		//myStruct.a = 11;
+		//myStruct.b = 22;
+		//myStruct.c = 0;
+		//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
+		//printf("接收数据：%d %d %f error=%d\n", myStruct.a, myStruct.b, myStruct.c, error);
 
-		myStruct.a = 11;
-		myStruct.b = 22;
-		myStruct.c = 0;
+		a++;
+		writeb(conngplat, "int1", &a, sizeof(a), &error); // 接收数据
+		a = 0;
+		//readb(conngplat, "int1", &a, sizeof(a), &error); // 接收数据
+		printf("a=%d\n", a);
 
-		readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
+		//writeb(conngplat, "mystruct1", &myStruct, sizeof(myStruct), &error); // 发送数据
+		//myStruct.a = 11;
+		//myStruct.b = 22;
+		//myStruct.c = 0;
+		//readb(conngplat, "mystruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
+		//printf("接收数据：%d %d %f error=%d\n", myStruct.a, myStruct.b, myStruct.c, error);
 
-		printf("接收数据：%d %d %f error=%d\n", myStruct.a, myStruct.b, myStruct.c, error);
+		//printf("\n");
 
 		//sleep(0.5);
-		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+		//std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
+
+	auto end = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+	std::cout << "执行时间: " << duration.count() << " 微秒" << std::endl;
+
+	printf("程序执行完毕\n");
 	
     return 0;
 }

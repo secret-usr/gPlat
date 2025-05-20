@@ -567,7 +567,6 @@ extern "C" bool readq(int sockfd, const char* qname, void* record, int actsize, 
 		if (*error != 0)
 			return false;
 
-		printf("readq ok\n");
 		memcpy(record, msg.body, msg.head.bodysize);
 		return true;
 	}
@@ -655,6 +654,9 @@ extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize,
 		return false;
 	}
 
+	//debug
+	auto start = std::chrono::high_resolution_clock::now();
+
 	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
 	{
 		fSuccess = true;
@@ -696,11 +698,15 @@ extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize,
 		if (*error != 0)
 			return false;
 
-		printf("readq ok\n");
 		memcpy(value, msg.body, msg.head.bodysize);
 		if (timestamp != 0) *timestamp = msg.head.timestamp;
-		return true;
 	}
+
+	//debug
+	auto end = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+	std::cout << "执行时间: " << duration.count() << " 微秒" << std::endl;
+
 	return true;
 }
 
@@ -724,6 +730,9 @@ extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize
 		return false;
 	}
 
+	//debug
+	auto start = std::chrono::high_resolution_clock::now();
+
 	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
 	{
 		if (send_all(sockfd, value, actsize) > 0)
@@ -734,6 +743,11 @@ extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize
 		{
 			fSuccess = false;
 		}
+
+		//debug
+		auto end = std::chrono::high_resolution_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+		std::cout << "执行时间1: " << duration.count() << " 微秒" << std::endl;
 	}
 
 	if (!fSuccess)
@@ -747,6 +761,11 @@ extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize
 	{
 		// Read client requests.
 		cbBytesRead = readn(sockfd, &msg, sizeof(MSGHEAD));
+
+		//debug
+		auto end = std::chrono::high_resolution_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+		std::cout << "执行时间2: " << duration.count() << " 微秒" << std::endl;
 
 		if (cbBytesRead < 0)
 		{
@@ -767,6 +786,12 @@ extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize
 		if (*error != 0)
 			return false;
 	}
+
+	//debug
+	auto end = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+	std::cout << "执行时间: " << duration.count() << " 微秒" << std::endl;
+
 	return true;
 }
 
@@ -834,8 +859,8 @@ extern "C" bool createtag(int sockfd, const char* tagname, int tagsize, void* ty
 	strcpy(msg.head.itemname, tagname);
 	msg.head.bodysize = typesize;
 
-	//mark 权宜之计，不支持复合类型
-	if (typesize > 8)
+	//mark 8+类型名+0结束符不能超过100字节
+	if (typesize > 100)
 	{
 		*error = ERROR_PARAMETER_SIZE;
 		return false;
@@ -3230,11 +3255,7 @@ Returns:  BOOL
 F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
 extern "C" bool CreateItem(const char* lpBoardName, const char* lpItemName, int itemSize, void* pType, int typeSize)
 {
-	//mark 最好区分这两种错误
-	//msg.h中定义了define MAXMSGLEN 2048，而DataQueue.cpp中的大量函数会检查读写的TAG是否超出此长度
-	//为了创建和读写超出此长度的字符串，将DataQueue.cpp中CreateItem里的大小检查注释，在qbd.cpp里控制创建非字符串TAG的大小
-	//如何突破MAXMSGLEN=2048的限制，需要后面细细斟酌
-	//if (itemSize > MAXMSGLEN || typeSize > TYPEMAXSIZE)
+	//目前看是不可能，因为只传入一个C++类型名
 	if (typeSize > TYPEMAXSIZE)
 	{
 		errorCode = ERROR_PARAMETER_SIZE;
@@ -3259,7 +3280,7 @@ extern "C" bool CreateItem(const char* lpBoardName, const char* lpItemName, int 
 	//WaitForSingleObject(hMutex, INFINITE);
 	std::unique_lock<std::mutex> lock(*tabmsg.pmutex_rw);
 
-	// search table in board index(hash table)
+	//search table in board index(hash table)
 	int loc, c, loc_s, c_s;
 	loc = hash1(lpItemName);
 	c = hash2(lpItemName);

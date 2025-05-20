@@ -25,6 +25,7 @@
 #include "ngx_c_socket.h"
 #include "ngx_c_memory.h"
 #include "ngx_c_lockmutex.h"
+#include <iostream>
 
 //gyb 控制子进程退出的信号量
 extern int sockpair[2]; //socketpair的文件描述符，父进程和子进程之间的通信管道
@@ -821,7 +822,11 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 					//此时，就变成了在epoll驱动下写数据，全部数据发送完毕后，再把写事件通知从epoll中干掉；
 					//优点：数据不多的时候，可以避免epoll的写事件的增加/删除，提高了程序的执行效率；                         
 				//(1)直接调用write或者send发送数据
-				ngx_log_stderr(errno, "即将发送数据%ud。", p_Conn->isendlen);	//mark 为啥传入errno而不是0
+				//debug
+				//ngx_log_stderr(errno, "即将发送数据%ud。", p_Conn->isendlen);	//mark 为啥传入errno而不是0
+				
+				//debug
+				auto start = std::chrono::high_resolution_clock::now();
 
 				sendsize = pSocketObj->sendproc(p_Conn, p_Conn->psendbuf, p_Conn->isendlen); //注意参数
 				if (sendsize > 0)
@@ -831,8 +836,9 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 						//成功发送的和要求发送的数据相等，说明全部发送成功了 发送缓冲区去了【数据全部发完】
 						p_memory->FreeMemory(p_Conn->psendMemPointer);  //释放内存
 						p_Conn->psendMemPointer = NULL;
-						p_Conn->iThrowsendCount = 0;  //这行其实可以没有，因此此时此刻这东西就是=0的                        
-						ngx_log_stderr(0, "CSocekt::ServerSendQueueThread()中数据发送完毕，很好。"); //做个提示吧，商用时可以干掉
+						p_Conn->iThrowsendCount = 0;  //这行其实可以没有，因此此时此刻这东西就是=0的
+						//debug
+						//ngx_log_stderr(0, "CSocekt::ServerSendQueueThread()中数据发送完毕，很好。"); //做个提示吧，商用时可以干掉
 					}
 					else  //没有全部发送完毕(EAGAIN)，数据只发出去了一部分，但肯定是因为 发送缓冲区满了,那么
 					{
@@ -856,9 +862,12 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 						ngx_log_stderr(errno, "CSocekt::ServerSendQueueThread()中数据没发送完毕【发送缓冲区满】，整个要发送%d，实际发送了%d。", p_Conn->isendlen, sendsize);
 
 					} //end if(sendsize > 0)
+					//debug
+					auto end = std::chrono::high_resolution_clock::now();
+					auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+					std::cout << "电文发送执行时间: " << duration.count() << " 微秒" << std::endl;
 					continue;  //继续处理其他消息                    
 				}  //end if(sendsize > 0)
-
 				//能走到这里，应该是有点问题的
 				else if (sendsize == 0)
 				{
@@ -900,7 +909,6 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 					p_Conn->iThrowsendCount = 0;  //这行其实可以没有，因此此时此刻这东西就是=0的  
 					continue;
 				}
-
 			} //end while(pos != posend)
 
 			err = pthread_mutex_unlock(&pSocketObj->m_sendMessageQueueMutex);

@@ -6,8 +6,10 @@
 #include <cstdlib> // for strtol
 #include <unistd.h>
 #include "..//include//higplat.h"
+#include <string.h>
 
 
+//-1代表复合类型
 enum TypeCode {
     Empty = 0,
     Boolean,
@@ -46,7 +48,6 @@ std::string GlobalObj::nodename = "";
 std::string GlobalObj::qbdname = "";
 
 void Analyse(const std::vector<std::string>& words);
-void Process(const std::vector<std::string>& words);
 
 int main(int argc, char* argv[])
 {
@@ -80,7 +81,7 @@ int main(int argc, char* argv[])
             std::transform(firstWord.begin(), firstWord.end(), firstWord.begin(),
                 [](unsigned char c) { return std::tolower(c); });
 
-            if (firstWord == "exit")
+            if (firstWord == "exit" || firstWord == "q")
                 break;
 
             Analyse(words);
@@ -125,9 +126,12 @@ void HandleOpenBoard()
     GlobalObj::prefix = GlobalObj::nodename + ".BOARD::>";
 }
 
+//para  复合类型名$负荷类型大小 或者 简单类型名
+//para2 数组大小
 bool CreateItem(const std::string& itemName, const std::string& para, const std::string& para2)
 {
     int arraysize = 0;
+
     if (!para2.empty()) {
         try {
             arraysize = std::stoi(para2);
@@ -149,9 +153,65 @@ bool CreateItem(const std::string& itemName, const std::string& para, const std:
     if (split.size() > 1) {
         if (arraysize == 0 || arraysize == 1) {
             // 复合类型 - 需要实现
+            char buff[100];
+            int* ptypecode = (int*)buff;
+            int* parraysize = (int*)(buff + 4);
+            *ptypecode = -1;
+            *parraysize = 0;
+            int itemsize = std::stoi(split[1]);
+            char* classname = buff + 8;
+            strcpy(classname, split[0].c_str());
+            int typesize = 8 + split[0].length() + 1; //类型代码，数组大小，类型名，0结束符
+
+            // 检查大小限制
+            if (itemsize > 128000) {
+                std::cout << "TAG的大小超过了128000，无法创建" << std::endl;
+                return false;
+            }
+
+            unsigned int err;
+            bool res = createtag(g_hConn, itemName.c_str(), itemsize, buff, typesize, &err);
+
+            if (res) {
+                std::cout << "Tag '" << itemName << "' created successfully, Record size="
+                    << itemsize << ", Type size=" << typesize << std::endl;
+            }
+            else {
+                std::cout << "Create Tag '" << itemName << "' fail with error code " << err << std::endl;
+            }
+
+            return res;
         }
-        else if (arraysize > 1 && arraysize < 1001) {
+        else if (arraysize > 1) {
             // 复合类型数组 - 需要实现
+            char buff[100];
+            int* ptypecode = (int*)buff;
+            int* parraysize = (int*)(buff + 4);
+            *ptypecode = -1;
+            *parraysize = 0;
+            int itemsize = std::stoi(split[1]) * arraysize;
+            char* classname = buff + 8;
+            strcpy(classname, split[0].c_str());
+            int typesize = 8 + split[0].length() + 1; //类型代码，数组大小，类型名，0结束符
+
+            // 检查大小限制
+            if (itemsize > 128000) {
+                std::cout << "TAG的大小超过了128000，无法创建" << std::endl;
+                return false;
+            }
+
+            unsigned int err;
+            bool res = createtag(g_hConn, itemName.c_str(), itemsize, buff, typesize, &err);
+
+            if (res) {
+                std::cout << "Tag '" << itemName << "' created successfully, Record size="
+                    << itemsize << ", Type size=" << typesize << std::endl;
+            }
+            else {
+                std::cout << "Create Tag '" << itemName << "' fail with error code " << err << std::endl;
+            }
+
+            return res;
         }
     }
     else if (arraysize == 0 || arraysize == 1) {
@@ -229,7 +289,7 @@ bool CreateItem(const std::string& itemName, const std::string& para, const std:
         }
         return res;
     }
-    else if (arraysize > 1 && arraysize < 10001) {
+    else if (arraysize > 1) {
         // 简单类型数组
         std::string typeName = para;
         TypeCode typecode = Empty;
@@ -383,7 +443,14 @@ void Analyse(const std::vector<std::string>& words)
 
     if (cmd == "connect")
     {
-        HandleConnect(words[1]);
+        if (words.size() < 2)
+        {
+            HandleConnect("127.0.0.1");
+        }
+        else
+        {
+            HandleConnect(words[1]);
+        }
         return;
     }
 

@@ -29,19 +29,9 @@
 #include "ngx_c_lockmutex.h"  //自动释放互斥量的一个类
 #include <iostream>
 
-//debug
-auto start = std::chrono::high_resolution_clock::now();
-
 //来数据时候的处理，当连接上有数据来的时候，本函数会被ngx_epoll_process_events()所调用  ,官方的类似函数为ngx_http_wait_request_handler();
 void CSocekt::ngx_read_request_handler(lpngx_connection_t pConn)
 {
-	//debug
-	//auto start = std::chrono::high_resolution_clock::now();
-
-	//debug
-	//int recvlen = 0; //接收数据的长度，先给0，表示没收到数据；
-	//recvlen = pConn->irecvlen; //要收的宽度
-
 	//收包，注意我们用的第二个和第三个参数，我们用的始终是这两个参数，因此我们必须保证 c->precvbuf指向正确的收包位置，保证c->irecvlen指向正确的收包宽度
 	ssize_t reco = recvproc(pConn, pConn->precvbuf, pConn->irecvlen);
 	if (reco <= 0)
@@ -52,9 +42,6 @@ void CSocekt::ngx_read_request_handler(lpngx_connection_t pConn)
 	//走到这里，说明成功收到了一些字节（>0），就要开始判断收到了多少数据了     
 	if (pConn->curStat == _PKG_HD_INIT) //连接建立起来时肯定是这个状态，因为在ngx_get_connection()中已经把curStat成员赋值成_PKG_HD_INIT了
 	{
-		//debug
-		start = std::chrono::high_resolution_clock::now();
-
 		if (reco == m_iLenPkgHeader)//正好收到完整包头，这里拆解包头
 		{
 			ngx_wait_request_handler_proc_p1(pConn); //那就调用专门针对包头处理完整的函数去处理把。
@@ -89,11 +76,6 @@ void CSocekt::ngx_read_request_handler(lpngx_connection_t pConn)
 		{
 			//收到的宽度等于要收的宽度，包体也收完整了
 			ngx_wait_request_handler_proc_plast(pConn);
-
-			//debug
-			auto end = std::chrono::high_resolution_clock::now();
-			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-			std::cout << "包体接收完整1: " << duration.count() << " 微秒" << std::endl;
 		}
 		else
 		{
@@ -110,11 +92,6 @@ void CSocekt::ngx_read_request_handler(lpngx_connection_t pConn)
 		{
 			//包体收完整了
 			ngx_wait_request_handler_proc_plast(pConn);
-
-			//debug
-			auto end = std::chrono::high_resolution_clock::now();
-			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-			std::cout << "包体接收完整2: " << duration.count() << " 微秒" << std::endl;
 		}
 		else
 		{

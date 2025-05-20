@@ -38,33 +38,33 @@ int main()
 
 	auto start = std::chrono::high_resolution_clock::now();
 	
-	for (int i = 0; i < 5; i++)
+	for (int i = 0; i < 10; i++)
 	{
 		myStruct.a++;
 		myStruct.b++;
 		myStruct.c++;
 
-		//writeq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 发送数据
-		//myStruct.a = 11;
-		//myStruct.b = 22;
-		//myStruct.c = 0;
-		//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
-		//printf("接收数据：%d %d %f error=%d\n", myStruct.a, myStruct.b, myStruct.c, error);
+		writeq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 发送数据
+		myStruct.a = 11;
+		myStruct.b = 22;
+		myStruct.c = 0;
+		readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
+		printf("接收数据：%d %d %f error=%d\n", myStruct.a, myStruct.b, myStruct.c, error);
 
 		a++;
 		writeb(conngplat, "int1", &a, sizeof(a), &error); // 接收数据
 		a = 0;
-		//readb(conngplat, "int1", &a, sizeof(a), &error); // 接收数据
+		readb(conngplat, "int1", &a, sizeof(a), &error); // 接收数据
 		printf("a=%d\n", a);
 
-		//writeb(conngplat, "mystruct1", &myStruct, sizeof(myStruct), &error); // 发送数据
-		//myStruct.a = 11;
-		//myStruct.b = 22;
-		//myStruct.c = 0;
-		//readb(conngplat, "mystruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
-		//printf("接收数据：%d %d %f error=%d\n", myStruct.a, myStruct.b, myStruct.c, error);
+		writeb(conngplat, "mystruct1", &myStruct, sizeof(myStruct), &error); // 发送数据
+		myStruct.a = 11;
+		myStruct.b = 22;
+		myStruct.c = 0;
+		readb(conngplat, "mystruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
+		printf("接收数据：%d %d %f error=%d\n", myStruct.a, myStruct.b, myStruct.c, error);
 
-		//printf("\n");
+		printf("\n");
 
 		//sleep(0.5);
 		//std::this_thread::sleep_for(std::chrono::milliseconds(100));

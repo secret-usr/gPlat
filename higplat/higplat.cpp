@@ -19,6 +19,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <string.h>
+#include <netinet/tcp.h>  //TCP_NODELAY
 
 
 #include "../include/msg.h"
@@ -331,6 +332,21 @@ int unblock_connect(const char* ip, int port, int time)
 
 	int sockfd = socket(PF_INET, SOCK_STREAM, 0);
 	int fdopt = setnonblocking(sockfd);
+
+	//Nagle 算法（发送方缓冲合并小包）
+	//TCP 默认启用 Nagle 算法，它的核心逻辑是：
+	//如果发送方有未确认的小数据（小于 MSS，通常 1460 字节），则会等待：
+	//直到收到前一个包的 ACK，或者
+	//累积到足够大的数据（MSS）再发送。
+
+	//你的情况：两次 send 的小数据可能被 Nagle 算法合并，导致第二个 send 延迟发送。
+	//服务器数据接收延迟现象最可能由 Nagle + Delayed ACK 组合 导致：
+	//客户端第一个send触发Nagle等待ACK。
+	//客户端第二个send因为Delayed ACK的40ms延迟，导致数据晚到。
+	//解决办法：发送方禁用 Nagle（适合低延迟场景）
+	int flag = 1;
+	setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+
 	ret = connect(sockfd, (struct sockaddr*)&address, sizeof(address));
 	if (ret == 0)
 	{
@@ -654,9 +670,6 @@ extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize,
 		return false;
 	}
 
-	//debug
-	auto start = std::chrono::high_resolution_clock::now();
-
 	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
 	{
 		fSuccess = true;
@@ -702,11 +715,6 @@ extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize,
 		if (timestamp != 0) *timestamp = msg.head.timestamp;
 	}
 
-	//debug
-	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	std::cout << "执行时间: " << duration.count() << " 微秒" << std::endl;
-
 	return true;
 }
 
@@ -731,7 +739,7 @@ extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize
 	}
 
 	//debug
-	auto start = std::chrono::high_resolution_clock::now();
+	//auto start = std::chrono::high_resolution_clock::now();
 
 	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
 	{
@@ -743,12 +751,14 @@ extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize
 		{
 			fSuccess = false;
 		}
-
-		//debug
-		auto end = std::chrono::high_resolution_clock::now();
-		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-		std::cout << "执行时间1: " << duration.count() << " 微秒" << std::endl;
 	}
+
+	//禁用Nagle算法（适合低延迟场景）后，则上面的代码和下面的执行效率相同
+	//memcpy(msg.body, value, actsize);
+	//if (send_all(sockfd, &msg, sizeof(MSGHEAD) + actsize) > 0)
+	//{
+	//	fSuccess = true;
+	//}
 
 	if (!fSuccess)
 	{
@@ -761,11 +771,6 @@ extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize
 	{
 		// Read client requests.
 		cbBytesRead = readn(sockfd, &msg, sizeof(MSGHEAD));
-
-		//debug
-		auto end = std::chrono::high_resolution_clock::now();
-		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-		std::cout << "执行时间2: " << duration.count() << " 微秒" << std::endl;
 
 		if (cbBytesRead < 0)
 		{
@@ -788,9 +793,9 @@ extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize
 	}
 
 	//debug
-	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	std::cout << "执行时间: " << duration.count() << " 微秒" << std::endl;
+	//auto end = std::chrono::high_resolution_clock::now();
+	//auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+	//std::cout << "执行时间: " << duration.count() << " 微秒" << std::endl;
 
 	return true;
 }

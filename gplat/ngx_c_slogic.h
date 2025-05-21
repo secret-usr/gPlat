@@ -29,7 +29,7 @@ public:
 	bool HandleSubscribe(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength);
 	bool HandleCreateItem(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength);
 
-	void NotifySubscriber(std::string tagName, char* pPkgHeader, unsigned short iBodyLength);
+	void NotifySubscriber(std::string tagName, char* pPkgHeader);
 
 public:
 	virtual void threadRecvProcFunc(char *pMsgBuf);

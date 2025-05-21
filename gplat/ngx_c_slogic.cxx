@@ -454,7 +454,7 @@ bool CLogicSocket::HandleWriteQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	if (ret)
 	{
 		strcpy(pPkgHead->itemname, pPkgHead->qname);	//必须的，因为最终发布事件的时候是用的itemname
-		NotifySubscriber(pPkgHead->itemname, pPkgHeader, iBodyLength);
+		NotifySubscriber(pPkgHead->itemname, pPkgHeader);
 	}
 
 	return true;
@@ -565,8 +565,7 @@ bool CLogicSocket::HandleWriteB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	//发布订阅
 	if (ret)
 	{
-		//debug
-		//NotifySubscriber(pPkgHead->itemname, pPkgHeader, iBodyLength);
+		NotifySubscriber(pPkgHead->itemname, pPkgHeader);
 	}
 
 	return true;
@@ -617,7 +616,7 @@ bool CLogicSocket::HandleSubscribe(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER 
 	return true;
 }
 
-void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader, unsigned short iBodyLength)
+void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader)
 {
 	std::list<EventNode> subscribers = m_subscriber.GetSubscriber(tagName);
 
@@ -646,14 +645,29 @@ void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader, unsig
 			memcpy(p_sendbuf + m_iLenMsgHeader, pPkgHeader, m_iLenPkgHeader);         //包头直接拷贝到这里来
 			PPKGHEAD pPkgHead = (PPKGHEAD)pPkgHeader; //包头
 			pPkgHead->id = POST;	//发布事件
+			pPkgHead->bodysize = 0;	//防御性编程，只发布事件，不发布数据
 
 			CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
 
 			switch (subscriber.eventid)
 			{
 			case EVENTID::DEFAULT:
-				//SendMsg((ClientContext*)subscriber.subscriber, pOverlapBuff);
-				msgSend(p_sendbuf);
+				//gyb 把超时放在客户端的read里实现
+				//if (pConn->m_bWaitingTimeout)
+				//{
+				//	pConn->m_bWaitingTimeout = false;
+				//	pConn->StopTimeoutTimer();
+				//}
+
+				if (pConn->m_bWaitingPost)
+				{
+					pConn->m_bWaitingPost = false;
+					msgSend(p_sendbuf);
+				}
+				else
+				{
+					pConn->m_listPost.push_back(p_sendbuf);
+				}
 				break;
 	//		case EVENTID::POST_DELAY:
 	//			NotifySubscriberOnDelayTime(subscriber.eventname, subscriber.eventarg, (ClientContext*)subscriber.subscriber, pOverlapBuff);

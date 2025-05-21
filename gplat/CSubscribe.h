@@ -15,7 +15,7 @@ enum EVENTID
 
 struct EventNode  
 {  
-    void* subscriber;  
+    void* subscriber;  //lpngx_connection_t
     char      eventname[40];  
     EVENTID   eventid;  
     int       eventarg;  

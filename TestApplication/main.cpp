@@ -25,16 +25,7 @@ int main()
 
 	unsigned int error;
 
-	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
-	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
-	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
-	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
-	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
-	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
-	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
-	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
-	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
-	//readq(conngplat, "MyStruct1", &myStruct, sizeof(myStruct), &error); // 接收数据
+	subscribe(conngplat, "int1", &error);
 
 	auto start = std::chrono::high_resolution_clock::now();
 	

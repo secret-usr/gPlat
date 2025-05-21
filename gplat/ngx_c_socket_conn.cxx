@@ -45,6 +45,7 @@ void ngx_connection_s::GetOneToUse()
 
 	curStat = _PKG_HD_INIT;                           //收包状态处于 初始状态，准备接收数据包头【状态机】
 	precvbuf = dataHeadInfo;                          //收包我要先收到这里来，因为我要先收包头，所以收数据的buff直接就是dataHeadInfo
+
 	//gyb
 	//irecvlen = sizeof(COMM_PKG_HEADER);               //这里指定收数据的长度，这里先要求收包头这么长字节的数据
 	irecvlen = sizeof(MSGHEAD);               //这里指定收数据的长度，这里先要求收包头这么长字节的数据
@@ -53,6 +54,9 @@ void ngx_connection_s::GetOneToUse()
 	iThrowsendCount = 0;                              //原子的
 	psendMemPointer = NULL;                           //发送数据头指针记录
 	events = 0;                              //epoll事件先给0 
+
+	//gyb
+	m_bWaitingPost = false;
 }
 
 //回收回来一个连接的时候做一些事

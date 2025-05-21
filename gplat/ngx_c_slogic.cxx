@@ -153,7 +153,7 @@ static const handler statusHandler[] =
 	 //POST,			//mark
 	 &CLogicSocket::noop,
 	 //POSTWAIT,		//mark
-	 &CLogicSocket::noop,
+	 &CLogicSocket::HandlePostWait,
 	 //PASSTOSERVER,	//mark 内部使用
 	 &CLogicSocket::noop,
 	 //CLEARB,			//mark
@@ -391,7 +391,7 @@ bool CLogicSocket::HandleReadQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsg
 	//mark 即使读取失败，也要返回一个包给客户端，而且包体的长度和用户申请的长度一致，这样用户读的时候就不会出错
 	//pPkgHead->bodysize = pPkgHead->datasize;
 
-	//mark
+	//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程
 	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
 
 	//b)填充消息头
@@ -432,7 +432,7 @@ bool CLogicSocket::HandleWriteQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 
 	pPkgHead->bodysize = 0;
 
-	//mark
+	//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程
 	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
 
 	int iLenPkgBody = 0;
@@ -493,7 +493,7 @@ bool CLogicSocket::HandleReadB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsg
 		pPkgHead->bodysize = 0;
 	}
 
-	//mark
+	//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程
 	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
 
 	//b)填充消息头
@@ -540,7 +540,7 @@ bool CLogicSocket::HandleWriteB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	
 	pPkgHead->bodysize = 0;
 
-	//mark
+	//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程，是不是有发送顺序的问题，假如在msgSend函数前切换线程
 	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
 
 	int iLenPkgBody = 0;
@@ -584,6 +584,9 @@ bool CLogicSocket::HandleSubscribe(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER 
 	}
 
 	PPKGHEAD pPkgHead = (PPKGHEAD)pPkgHeader; //包头
+
+	//mark
+	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
 	pConn->Attach(pPkgHead->itemname);
 
 	EventNode eventnode;
@@ -596,9 +599,6 @@ bool CLogicSocket::HandleSubscribe(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER 
 	pPkgHead->error = 0;
 	pPkgHead->bodysize = 0;
 
-	//mark
-	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
-
 	int iLenPkgBody = 0;
 	CMemory* p_memory = CMemory::GetInstance();
 	char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + iLenPkgBody, false);//准备发送的格式，这里是消息头+包头+包体
@@ -609,6 +609,35 @@ bool CLogicSocket::HandleSubscribe(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER 
 
 	//d)填充包体
 	LPSTRUCT_REGISTER p_sendInfo = (LPSTRUCT_REGISTER)(p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader);	//跳过消息头，跳过包头，就是包体了
+
+	//f)发送数据包
+	msgSend(p_sendbuf);
+
+	return true;
+}
+
+bool CLogicSocket::HandlePostWait(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
+{
+	ngx_log_stderr(0, "执行了CLogicSocket::HandlePostWait()!");
+
+	//(1)首先判断包体的合法性
+	if (pPkgHeader == NULL) //具体看客户端服务器约定，如果约定这个命令[msgCode]必须带包体，那么如果不带包体，就认为是恶意包，直接不处理    
+	{
+		return false;
+	}
+
+	//mark
+	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
+
+	if (pConn->m_listPost.empty())
+	{
+		pConn->m_bWaitingPost = true;
+		return true;
+	}
+
+	pConn->m_bWaitingPost = false;
+	char* p_sendbuf = pConn->m_listPost.front();
+	pConn->m_listPost.pop_front();
 
 	//f)发送数据包
 	msgSend(p_sendbuf);
@@ -647,6 +676,7 @@ void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader)
 			pPkgHead->id = POST;	//发布事件
 			pPkgHead->bodysize = 0;	//防御性编程，只发布事件，不发布数据
 
+			//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程
 			CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
 
 			switch (subscriber.eventid)

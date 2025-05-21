@@ -409,6 +409,7 @@ int unblock_connect(const char* ip, int port, int time)
 int send_all(int sockfd, const void* buf, size_t len) {
 	size_t total_sent = 0;
 	while (total_sent < len) {
+		//mark send会像下面的readn一样被信号中断吗
 		int sent = send(sockfd, (char*)buf + total_sent, len - total_sent, 0);
 		if (sent <= 0) return sent; // 错误或连接关闭
 		total_sent += sent;
@@ -915,6 +916,73 @@ extern "C" bool createtag(int sockfd, const char* tagname, int tagsize, void* ty
 			return false;
 	}
 	return true;
+}
+
+extern "C" bool waitpostdata(int sockfd, std::string& tagname, int& datasize, unsigned int timeout, unsigned int* error)
+{
+	bool   fSuccess = false;
+	int  cbBytesRead, cbWritten;
+	MSGSTRUCT     msg;
+
+	msg.head.id = POSTWAIT;
+	//gyb 超时在本地实现
+	msg.head.error = INT32_MAX		;		//利用error字段传递超时设定时间
+	msg.head.bodysize = 0;
+
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
+	{
+		fSuccess = true;
+	}
+
+	if (!fSuccess)
+	{
+		printf("send_all failed\n");
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+	else
+	{
+		// 这里实现超时读
+		// Read client requests.
+		cbBytesRead = readn(sockfd, &msg, sizeof(MSGHEAD));
+
+		cbBytesRead = readn_timeout(sockfd, &msg, sizeof(MSGHEAD), timeout);
+
+		if (cbBytesRead < 0)
+		{
+			if (errno = ETIMEDOUT)
+			{
+				tagname = "WAIT_TIMEOUT";
+				*error = 0;
+				return true;
+			}
+			else
+			{
+				printf("readn failed\n");
+				*error = errno;
+				close(sockfd);
+				return false;
+			}
+		}
+
+		if (msg.head.bodysize > 0)
+		{
+			printf("error: 事件电文不附带数据\n");
+			close(sockfd);
+			return false;
+		}
+
+		*error = msg.head.error;
+		if (*error != 0)
+		{
+			tagname = "";
+			return false;
+		}
+
+		tagname = msg.head.itemname;
+		return true;
+	}
 }
 
 /*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F

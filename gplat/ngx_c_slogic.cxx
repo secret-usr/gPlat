@@ -652,13 +652,6 @@ void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader)
 			switch (subscriber.eventid)
 			{
 			case EVENTID::DEFAULT:
-				//gyb 把超时放在客户端的read里实现
-				//if (pConn->m_bWaitingTimeout)
-				//{
-				//	pConn->m_bWaitingTimeout = false;
-				//	pConn->StopTimeoutTimer();
-				//}
-
 				if (pConn->m_bWaitingPost)
 				{
 					pConn->m_bWaitingPost = false;

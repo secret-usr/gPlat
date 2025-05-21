@@ -151,6 +151,7 @@ extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize,
 extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error);
 extern "C" bool subscribe(int sockfd, const char* tagname, unsigned int* error);
 extern "C" bool createtag(int sockfd, const char* tagname, int tagsize, void* type, int typesize, unsigned int* error);
+extern "C" bool waitpostdata(int sockfd, std::string& tagname, int& datasize, unsigned int timeout, unsigned int* error);
 
 //DllImport BOOL __cdecl GetQueuePath(LPTSTR lpPath, size_t count);
 extern "C" bool CreateB(const char* lpFileName, int size);

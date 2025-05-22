@@ -626,22 +626,55 @@ bool CLogicSocket::HandlePostWait(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER p
 		return false;
 	}
 
+	PPKGHEAD pPkgHead = (PPKGHEAD)pPkgHeader; //包头
+
 	//mark
 	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
 
-	if (pConn->m_listPost.empty())
+	if (!pConn->m_listPost.empty())
 	{
-		pConn->m_bWaitingPost = true;
-		return true;
+		pConn->m_bWaitingPost = false;
+		char* p_sendbuf = pConn->m_listPost.front();
+		pConn->m_listPost.pop_front();
+
+		//f)发送数据包
+		msgSend(p_sendbuf);
 	}
+	else
+	{
+		int dwWaitingTime = pPkgHead->error;
+		if (dwWaitingTime == -1)
+		{
+			pConn->m_bWaitingPost = true;
+			pConn->m_bWaitingTimeout = false;
+		}
+		else if (dwWaitingTime == 0)
+		{
+			pConn->m_bWaitingPost = false;
+			pConn->m_bWaitingTimeout = false;
 
-	pConn->m_bWaitingPost = false;
-	char* p_sendbuf = pConn->m_listPost.front();
-	pConn->m_listPost.pop_front();
+			CMemory* p_memory = CMemory::GetInstance();
+			char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + 0, false);//准备发送的格式，这里是消息头+包头
+			//b)填充消息头
+			memcpy(p_sendbuf, pMsgHeader, m_iLenMsgHeader);           //消息头直接拷贝到这里来
+			//c)填充包头
+			PPKGHEAD pPkgHead = (PPKGHEAD)(p_sendbuf + m_iLenMsgHeader);
+			pPkgHead->id = POSTWAIT;
+			pPkgHead->itemname[0] = '\0';
+			pPkgHead->error = ETIMEDOUT;
+			pPkgHead->bodysize = 0;
+			//f)发送数据包
+			msgSend(p_sendbuf);
+		}
+		else
+		{
+			pConn->m_bWaitingPost = true;
+			pConn->m_bWaitingTimeout = true;
 
-	//f)发送数据包
-	msgSend(p_sendbuf);
-
+			//启动最小堆定时器
+			pConn->StartTimeoutTimer(dwWaitingTime);
+		}
+	}
 	return true;
 }
 

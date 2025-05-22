@@ -22,6 +22,8 @@
 #include "ngx_c_crc32.h"       //和crc32校验算法有关 
 #include "ngx_c_slogic.h"      //和socket通讯相关
 
+#include "../include/TimerManager.h"
+
 //本文件用的函数声明
 static void freeresource();
 //gyb
@@ -36,9 +38,10 @@ char* gp_envmem = NULL;        //指向自己分配的env环境变量的内存�
 int     g_daemonized = 0;         //守护进程标记，标记是否启用了守护进程模式，0：未启用，1：启用了
 
 //socket/线程池相关
-//CSocekt      g_socket;          //socket全局对象
+//CSocekt      g_socket;        //socket全局对象
 CLogicSocket   g_socket;        //socket全局对象  
 CThreadPool    g_threadpool;    //线程池全局对象
+TimerManager   g_tm;			//定时器全局对象(在构造函数里启动了定时器线程)
 
 //和进程本身有关的全局量
 pid_t   ngx_pid;                //当前进程的pid

@@ -918,15 +918,15 @@ extern "C" bool createtag(int sockfd, const char* tagname, int tagsize, void* ty
 	return true;
 }
 
-extern "C" bool waitpostdata(int sockfd, std::string& tagname, int& datasize, unsigned int timeout, unsigned int* error)
+extern "C" bool waitpostdata(int sockfd, std::string& tagname, int& datasize, int timeout, unsigned int* error)
 {
 	bool   fSuccess = false;
 	int  cbBytesRead, cbWritten;
 	MSGSTRUCT     msg;
 
+	//绝对不能在本地实现超时，否则容易出现问题
 	msg.head.id = POSTWAIT;
-	//gyb 超时在本地实现
-	msg.head.error = INT32_MAX		;		//利用error字段传递超时设定时间
+	msg.head.error = timeout;		//利用error字段传递超时设定时间
 	msg.head.bodysize = 0;
 
 	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
@@ -946,8 +946,6 @@ extern "C" bool waitpostdata(int sockfd, std::string& tagname, int& datasize, un
 		// 这里实现超时读
 		// Read client requests.
 		cbBytesRead = readn(sockfd, &msg, sizeof(MSGHEAD));
-
-		cbBytesRead = readn_timeout(sockfd, &msg, sizeof(MSGHEAD), timeout);
 
 		if (cbBytesRead < 0)
 		{

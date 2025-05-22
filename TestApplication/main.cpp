@@ -25,7 +25,7 @@ int main()
 
 	unsigned int error;
 
-	subscribe(conngplat, "int1", &error);
+	//subscribe(conngplat, "int1", &error);
 
 	auto start = std::chrono::high_resolution_clock::now();
 	
@@ -65,6 +65,32 @@ int main()
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
 	std::cout << "执行时间: " << duration.count() << " 微秒" << std::endl;
+
+
+	std::string eventname;
+	int tagsize = 0;
+	
+	while (1)
+	{
+		eventname = waitpostdata(conngplat, eventname, tagsize, 1000, &error); // 等待数据到达
+		if (eventname == "int1")
+		{
+			int a = 0;
+			readb(conngplat, eventname.c_str(), &a, sizeof(a), &error); // 接收数据
+			printf("接收数据：%d error=%d\n", a, error);
+		}
+		else if (eventname == "MyStruct1")
+		{
+			MyStruct myStruct;
+			readq(conngplat, eventname.c_str(), &myStruct, sizeof(myStruct), &error); // 接收数据
+			printf("接收数据：%d %d %f error=%d\n", myStruct.a, myStruct.b, myStruct.c, error);
+		}
+		else if (eventname == "WAIT_TIMEOUT")
+		{
+			break;
+		}
+	}
+	eventname = waitpostdata(conngplat, eventname, tagsize, 1000, &error); // 等待数据到达
 
 	printf("程序执行完毕\n");
 	

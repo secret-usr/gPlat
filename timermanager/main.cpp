@@ -531,11 +531,11 @@ int main() {
 		// 添加定时器
 		auto timer1 = tm.addTimer(1000, [](void*) {
 			std::cout << "Timer 1 fired after 1 second" << std::endl;
-			});
+			}, nullptr);
 
 		auto timer2 = tm.addTimer(2000, [](void*) {
 			std::cout << "Timer 2 fired after 2 seconds" << std::endl;
-			});
+			}, nullptr);
 
 		// 3秒后取消timer2
 		//std::this_thread::sleep_for(std::chrono::seconds(1));

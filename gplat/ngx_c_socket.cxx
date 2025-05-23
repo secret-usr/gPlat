@@ -121,14 +121,6 @@ bool CSocekt::Initialize_subproc()
 		return false;
 	}
 
-	//ThreadItem* pTimerManager;    //专门用来实现定时器的线程
-	//m_threadVector.push_back(pTimerManager = new ThreadItem(this));
-	//err = pthread_create(&pTimerManager->_Handle, NULL, ServerTimerManagerThread, pTimerManager);
-	//if (err != 0)
-	//{
-	//	return false;
-	//}
-
 	return true;
 }
 
@@ -935,7 +927,12 @@ void ngx_connection_s::StartTimeoutTimer(int dwMilliseconds)
 	g_tm.addTimer(dwMilliseconds, [](void* user)
 		{
 			std::cout << "超时时间到" << std::endl;
+
 			lpngx_connection_t pConn = (lpngx_connection_t)user;
+
+			//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程
+			CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
+
 			if (pConn->m_bWaitingTimeout)
 			{
 				pConn->m_bWaitingTimeout = false;
@@ -943,9 +940,6 @@ void ngx_connection_s::StartTimeoutTimer(int dwMilliseconds)
 
 				CMemory* p_memory = CMemory::GetInstance();
 				char* p_sendbuf = (char*)p_memory->AllocMemory(sizeof(STRUC_MSG_HEADER) + sizeof(PKGHEAD) + 0, false); //分配内存【长度是 消息头长度  + 包头长度 + 包体长度】，最后参数先给false，表示内存不需要memset;
-
-				//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程
-				CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
 
 				//a)先填写消息头内容
 				LPSTRUC_MSG_HEADER ptmpMsgHeader = (LPSTRUC_MSG_HEADER)p_sendbuf;
@@ -958,7 +952,7 @@ void ngx_connection_s::StartTimeoutTimer(int dwMilliseconds)
 				pPkgHead->error = ETIMEDOUT;
 				pPkgHead->bodysize = 0;
 				//f)发送数据包
-				g_socket.msgSend((char*)user);
+				g_socket.msgSend(p_sendbuf);
 			}
 		},
 		this);

@@ -23,6 +23,15 @@ public:
     using TimerID = int;
 
     TimerManager() : epoll_fd_(-1), wakeup_fd_(-1), shutdown_(false) {
+        
+    }
+
+    ~TimerManager() {
+        close(epoll_fd_);
+        close(wakeup_fd_);
+    }
+
+    void start() {
         epoll_fd_ = epoll_create1(0);
         if (epoll_fd_ == -1) {
             throw std::runtime_error("Failed to create epoll: " +
@@ -48,18 +57,18 @@ public:
 
         // 启动事件处理线程
         worker_thread_ = std::thread(&TimerManager::processTimers, this);
-    }
+	}
 
-    ~TimerManager() {
-        shutdown();
+    void stop() {
+        if (!shutdown_.exchange(true))
+        {
+            wakeup();
 
-        if (worker_thread_.joinable()) {
-            worker_thread_.join();
+            if (worker_thread_.joinable()) {
+                worker_thread_.join();
+            }
         }
-
-        close(epoll_fd_);
-        close(wakeup_fd_);
-    }
+	}
 
     TimerID addTimer(uint64_t delay_ms, TimerCallback callback, void * user) {
         int timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
@@ -140,11 +149,11 @@ public:
         return true;
     }
 
-    void shutdown() {
-        if (!shutdown_.exchange(true)) {
-            wakeup();
-        }
-    }
+    //void shutdown() {
+    //    if (!shutdown_.exchange(true)) {
+    //        wakeup();
+    //    }
+    //}
 
 private:
     struct TimerEvent {

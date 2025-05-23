@@ -179,7 +179,6 @@ static void ngx_worker_process_cycle(int inum, const char* pprocname)
 	//setvbuf(stdout,NULL,_IONBF,0); //这个函数. 直接将printf缓冲区禁止， printf就直接输出了。
 	for (;;)
 	{
-		//mark 目前无法优雅退出，因为ngx_process_events_and_timers()函数里边是无限超时等待（-1）
 		ngx_process_events_and_timers(); //处理网络事件和定时器事件
 
 		if (g_stopEventChild == 1) //优雅的退出
@@ -193,6 +192,7 @@ static void ngx_worker_process_cycle(int inum, const char* pprocname)
 	//如果从这个循环跳出来
 	g_threadpool.StopAll();      //考虑在这里停止线程池；
 	g_socket.Shutdown_subproc(); //socket需要释放的东西考虑释放；
+	g_tm.stop();                 //停止定时器线程；
 	return;
 }
 
@@ -216,6 +216,15 @@ static void ngx_worker_process_init(int inum)
 		exit(-2);
 	}
 	sleep(1); //再休息1秒；
+
+	//启动定时器的线程，率先创建，至少要比和socket相关的内容优先
+	try
+	{
+		g_tm.start();
+	}
+	catch (const std::exception& e) {
+		std::cerr << "Error: " << e.what() << std::endl;
+	}
 
 	//创建发送数据和回收连接的线程
 	if (g_socket.Initialize_subproc() == false) //初始化子进程需要具备的一些多线程能力相关的信息

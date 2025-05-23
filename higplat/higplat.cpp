@@ -918,69 +918,34 @@ extern "C" bool createtag(int sockfd, const char* tagname, int tagsize, void* ty
 	return true;
 }
 
-extern "C" bool waitpostdata(int sockfd, std::string& tagname, int& datasize, int timeout, unsigned int* error)
+extern "C" bool waitpostdata(int sockfd, std::string& tagname, int timeout, unsigned int* error)
 {
-	bool   fSuccess = false;
-	int  cbBytesRead, cbWritten;
-	MSGSTRUCT     msg;
-
 	//绝对不能在本地实现超时，否则容易出现问题
+	MSGSTRUCT msg{};
 	msg.head.id = POSTWAIT;
-	msg.head.error = timeout;		//利用error字段传递超时设定时间
+	msg.head.error = timeout;  // 或 htonl(timeout)
 	msg.head.bodysize = 0;
 
-	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
-	{
-		fSuccess = true;
-	}
-
-	if (!fSuccess)
-	{
-		printf("send_all failed\n");
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
 		*error = errno;
 		close(sockfd);
 		return false;
 	}
-	else
-	{
-		// 这里实现超时读
-		// Read client requests.
-		cbBytesRead = readn(sockfd, &msg, sizeof(MSGHEAD));
 
-		if (cbBytesRead < 0)
-		{
-			if (errno = ETIMEDOUT)
-			{
-				tagname = "WAIT_TIMEOUT";
-				*error = 0;
-				return true;
-			}
-			else
-			{
-				printf("readn failed\n");
-				*error = errno;
-				close(sockfd);
-				return false;
-			}
-		}
-
-		if (msg.head.bodysize > 0)
-		{
-			printf("error: 事件电文不附带数据\n");
-			close(sockfd);
-			return false;
-		}
-
-		*error = msg.head.error;
-		if (*error != 0)
-		{
-			tagname = "";
-			return false;
-		}
-
-		tagname = msg.head.itemname;
-		return true;
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
 	}
+
+	*error = msg.head.error;  // 或 ntohl(msg.head.error)
+	if (*error != 0) {
+		tagname = (*error == ETIMEDOUT) ? "WAIT_TIMEOUT" : "";
+		return (*error == ETIMEDOUT);  // 仅超时返回 true
+	}
+
+	tagname = msg.head.itemname ? msg.head.itemname : "";
+	return true;
 }
 
 /*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F

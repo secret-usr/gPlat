@@ -528,6 +528,8 @@ int main() {
 	try {
 		TimerManager tm;
 
+		tm.start();  // 启动定时器管理器线程
+
 		// 添加定时器
 		auto timer1 = tm.addTimer(1000, [](void*) {
 			std::cout << "Timer 1 fired after 1 second" << std::endl;
@@ -544,9 +546,9 @@ int main() {
 		//}
 
 		// 等待剩余定时器执行
-		std::this_thread::sleep_for(std::chrono::seconds(2));
+		std::this_thread::sleep_for(std::chrono::seconds(5));
 
-		// 析构函数会自动清理
+		tm.stop();  // 停止定时器管理器线程
 	}
 	catch (const std::exception& e) {
 		std::cerr << "Error: " << e.what() << std::endl;

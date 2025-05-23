@@ -715,6 +715,12 @@ void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader)
 			switch (subscriber.eventid)
 			{
 			case EVENTID::DEFAULT:
+				if (pConn->m_bWaitingTimeout)
+				{
+					pConn->m_bWaitingTimeout = false;
+					pConn->StopTimeoutTimer();
+				}
+
 				if (pConn->m_bWaitingPost)
 				{
 					pConn->m_bWaitingPost = false;
@@ -772,6 +778,7 @@ void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader)
 			*/
 			default:
 				//pOverlapBuff->DecRef();
+				ngx_log_stderr(0, "ERROR:unknown eventid");
 				p_memory->FreeMemory(p_sendbuf);	//释放内存
 				break;
 			}

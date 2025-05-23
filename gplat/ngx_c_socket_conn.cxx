@@ -58,6 +58,7 @@ void ngx_connection_s::GetOneToUse()
 	//gyb
 	m_bWaitingPost = false;
 	m_bWaitingTimeout = false;
+	m_timerID = -1;
 }
 
 //回收回来一个连接的时候做一些事

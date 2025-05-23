@@ -824,7 +824,7 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 				//(1)直接调用write或者send发送数据
 				//debug
 				//ngx_log_stderr(errno, "即将发送数据%ud。", p_Conn->isendlen);	//mark 为啥传入errno而不是0
-				
+
 				//debug
 				auto start = std::chrono::high_resolution_clock::now();
 
@@ -924,36 +924,46 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 void ngx_connection_s::StartTimeoutTimer(int dwMilliseconds)
 {
 	//mark 使用了全局变量
-	g_tm.addTimer(dwMilliseconds, [](void* user)
+	m_timerID = g_tm.addTimer(dwMilliseconds, [](void* user) {
+		std::cout << "超时时间到" << std::endl;
+
+		lpngx_connection_t pConn = (lpngx_connection_t)user;
+
+		//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程
+		CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
+
+		if (pConn->m_bWaitingTimeout)
 		{
-			std::cout << "超时时间到" << std::endl;
+			pConn->m_bWaitingTimeout = false;
+			pConn->m_bWaitingPost = false;
 
-			lpngx_connection_t pConn = (lpngx_connection_t)user;
+			CMemory* p_memory = CMemory::GetInstance();
+			char* p_sendbuf = (char*)p_memory->AllocMemory(sizeof(STRUC_MSG_HEADER) + sizeof(PKGHEAD) + 0, false); //分配内存【长度是 消息头长度  + 包头长度 + 包体长度】，最后参数先给false，表示内存不需要memset;
 
-			//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程
-			CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
-
-			if (pConn->m_bWaitingTimeout)
-			{
-				pConn->m_bWaitingTimeout = false;
-				pConn->m_bWaitingPost = false;
-
-				CMemory* p_memory = CMemory::GetInstance();
-				char* p_sendbuf = (char*)p_memory->AllocMemory(sizeof(STRUC_MSG_HEADER) + sizeof(PKGHEAD) + 0, false); //分配内存【长度是 消息头长度  + 包头长度 + 包体长度】，最后参数先给false，表示内存不需要memset;
-
-				//a)先填写消息头内容
-				LPSTRUC_MSG_HEADER ptmpMsgHeader = (LPSTRUC_MSG_HEADER)p_sendbuf;
-				ptmpMsgHeader->pConn = pConn;
-				ptmpMsgHeader->iCurrsequence = pConn->iCurrsequence; //收到包时的连接池中连接序号记录到消息头里来，以备将来用；
-				//b)再填写包头内容
-				PPKGHEAD pPkgHead = (PPKGHEAD)(p_sendbuf + sizeof(STRUC_MSG_HEADER));
-				pPkgHead->id = POSTWAIT;
-				pPkgHead->itemname[0] = '\0';
-				pPkgHead->error = ETIMEDOUT;
-				pPkgHead->bodysize = 0;
-				//f)发送数据包
-				g_socket.msgSend(p_sendbuf);
-			}
+			//a)先填写消息头内容
+			LPSTRUC_MSG_HEADER ptmpMsgHeader = (LPSTRUC_MSG_HEADER)p_sendbuf;
+			ptmpMsgHeader->pConn = pConn;
+			ptmpMsgHeader->iCurrsequence = pConn->iCurrsequence; //收到包时的连接池中连接序号记录到消息头里来，以备将来用；
+			//b)再填写包头内容
+			PPKGHEAD pPkgHead = (PPKGHEAD)(p_sendbuf + sizeof(STRUC_MSG_HEADER));
+			pPkgHead->id = POSTWAIT;
+			pPkgHead->itemname[0] = '\0';
+			pPkgHead->error = ETIMEDOUT;
+			pPkgHead->bodysize = 0;
+			//f)发送数据包
+			g_socket.msgSend(p_sendbuf);
+		}
 		},
 		this);
+}
+
+void ngx_connection_s::StopTimeoutTimer()
+{
+	if (m_timerID < 0)
+	{
+		ngx_log_stderr(0, "StopTimeoutTimer : m_timerID < 0!");
+		return;
+	}
+
+	g_tm.removeTimer(m_timerID); //删除定时器
 }

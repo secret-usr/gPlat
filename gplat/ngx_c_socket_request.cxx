@@ -36,6 +36,14 @@ void CSocekt::ngx_read_request_handler(lpngx_connection_t pConn)
 	ssize_t reco = recvproc(pConn, pConn->precvbuf, pConn->irecvlen);
 	if (reco <= 0)
 	{
+		//gyb
+		CLock lock(&pConn->logicPorcMutex);
+		if (pConn->m_bWaitingTimeout)
+		{
+			pConn->m_bWaitingTimeout = false;
+			pConn->StopTimeoutTimer();
+		}
+
 		return;//该处理的上边这个recvproc()函数处理过了，这里<=0是直接return        
 	}
 

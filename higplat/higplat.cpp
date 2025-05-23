@@ -721,201 +721,164 @@ extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize,
 
 extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error)
 {
-	bool   fSuccess = false;
-	int  cbBytesRead, cbWritten;
-	MSGSTRUCT     msg;
+	// 参数校验
+	if (!tagname || !value || !error || actsize <= 0) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
 
+	if (actsize > MAXMSGLEN) {
+		*error = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+
+	// 初始化消息头
+	MSGSTRUCT msg{};
 	msg.head.id = WRITEB;
-	strcpy(msg.head.qname, "BOARD");
-	strcpy(msg.head.itemname, tagname);
 	msg.head.datasize = actsize;
 	msg.head.bodysize = actsize;
 	msg.head.offset = 0;
 	msg.head.subsize = 0;
 
-	if (msg.head.bodysize > MAXMSGLEN)
-	{
-		*error = ERROR_PARAMETER_SIZE;
-		return false;
-	}
+	// 安全拷贝字符串
+	strncpy(msg.head.qname, "BOARD", sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
 
-	//debug
-	//auto start = std::chrono::high_resolution_clock::now();
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
 
-	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
-	{
-		if (send_all(sockfd, value, actsize) > 0)
-		{
-			fSuccess = true;
-		}
-		else
-		{
-			fSuccess = false;
-		}
-	}
-
-	//禁用Nagle算法（适合低延迟场景）后，则上面的代码和下面的执行效率相同
+	//禁用Nagle算法（适合低延迟场景）后，则执行效率相同
 	//memcpy(msg.body, value, actsize);
-	//if (send_all(sockfd, &msg, sizeof(MSGHEAD) + actsize) > 0)
-	//{
-	//	fSuccess = true;
-	//}
-
-	if (!fSuccess)
-	{
-		printf("send_all failed\n");
+	//send_all(sockfd, &msg, sizeof(MSGHEAD) + actsize);
+	// 发送消息头和数据（单次发送优化）
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0 ||
+		send_all(sockfd, value, actsize) <= 0) {
 		*error = errno;
 		close(sockfd);
 		return false;
 	}
-	else
-	{
-		// Read client requests.
-		cbBytesRead = readn(sockfd, &msg, sizeof(MSGHEAD));
 
-		if (cbBytesRead < 0)
-		{
-			printf("readn failed\n");
-			*error = errno;
-			close(sockfd);
-			return false;
-		}
-
-		if (msg.head.bodysize > 0)
-		{
-			printf("error: 应答电文不可能有电文体\n");
-			close(sockfd);
-			return false;
-		}
-
-		*error = msg.head.error;
-		if (*error != 0)
-			return false;
+	// 接收响应
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
 	}
 
-	//debug
-	//auto end = std::chrono::high_resolution_clock::now();
-	//auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	//std::cout << "执行时间: " << duration.count() << " 微秒" << std::endl;
+	// 验证响应
+	if (msg.head.bodysize > 0) {
+		*error = ERROR_INVALID_RESPONSE;
+		close(sockfd);
+		return false;
+	}
 
-	return true;
+	*error = msg.head.error;
+	return (*error == 0);
 }
 
 extern "C" bool subscribe(int sockfd, const char* tagname, unsigned int* error)
 {
-	bool   fSuccess = false;
-	int  cbBytesRead, cbWritten;
-	MSGSTRUCT     msg;
+	// 参数校验
+	if (!tagname || !error) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
 
+	// 初始化消息结构体
+	MSGSTRUCT msg{};
 	msg.head.id = SUBSCRIBE;
-	strcpy(msg.head.itemname, tagname);
-	strcpy(msg.head.qname, tagname);		//用qname字段保存用户定义的事件名！
 	msg.head.eventid = EVENTID::DEFAULT;
 	msg.head.eventarg = 0;
 	msg.head.bodysize = 0;
 
-	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
-	{
-		fSuccess = true;
-	}
+	// 安全拷贝字符串（防止缓冲区溢出）
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
 
-	if (!fSuccess)
-	{
-		printf("send_all failed\n");
+	strncpy(msg.head.qname, tagname, sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	// 发送请求
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
 		*error = errno;
 		close(sockfd);
 		return false;
 	}
-	else
-	{
-		// Read client requests.
-		cbBytesRead = readn(sockfd, &msg, sizeof(MSGHEAD));
 
-		if (cbBytesRead < 0)
-		{
-			printf("readn failed\n");
-			*error = errno;
-			close(sockfd);
-			return false;
-		}
-
-		if (msg.head.bodysize > 0)
-		{
-			printf("error: 应答电文不可能有电文体\n");
-			close(sockfd);
-			return false;
-		}
-
-		*error = msg.head.error;
-		if (*error != 0)
-			return false;
+	// 读取响应
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
 	}
-	return true;
+
+	// 验证响应
+	if (msg.head.bodysize > 0) {
+		*error = ERROR_INVALID_RESPONSE;
+		close(sockfd);
+		return false;
+	}
+
+	*error = msg.head.error;
+	return (*error == 0);
 }
 
 extern "C" bool createtag(int sockfd, const char* tagname, int tagsize, void* type, int typesize, unsigned int* error)
 {
-	bool   fSuccess = false;
-	int  cbBytesRead, cbWritten;
-	MSGSTRUCT     msg;
+	// 参数校验
+	if (!tagname || !type || !error) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
 
-	msg.head.id = CREATEITEM;
-	msg.head.recsize = tagsize;
-	strcpy(msg.head.qname, "BOARD");
-	strcpy(msg.head.itemname, tagname);
-	msg.head.bodysize = typesize;
-
-	//mark 8+类型名+0结束符不能超过100字节
-	if (typesize > 100)
-	{
+	if (typesize > 100) {  // 类型数据大小限制
 		*error = ERROR_PARAMETER_SIZE;
 		return false;
 	}
 
-	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
-	{
-		if (send_all(sockfd, type, typesize) > 0)
-		{
-			fSuccess = true;
-		}
-		else
-		{
-			fSuccess = false;
-		}
-	}
+	// 初始化消息结构体
+	MSGSTRUCT msg{};
+	msg.head.id = CREATEITEM;
+	msg.head.recsize = tagsize;
+	msg.head.bodysize = typesize;
 
-	if (!fSuccess)
-	{
-		printf("send_all failed\n");
+	// 安全拷贝字符串（防止缓冲区溢出）
+	strncpy(msg.head.qname, "BOARD", sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+
+	// 发送消息头
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
 		*error = errno;
 		close(sockfd);
 		return false;
 	}
-	else
-	{
-		// Read client requests.
-		cbBytesRead = readn(sockfd, &msg, sizeof(MSGHEAD));
 
-		if (cbBytesRead < 0)
-		{
-			printf("readn failed\n");
-			*error = errno;
-			close(sockfd);
-			return false;
-		}
-
-		if (msg.head.bodysize > 0)
-		{
-			printf("error: 应答电文不可能有电文体\n");
-			close(sockfd);
-			return false;
-		}
-
-		*error = msg.head.error;
-		if (*error != 0)
-			return false;
+	// 发送类型数据
+	if (send_all(sockfd, type, typesize) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
 	}
-	return true;
+
+	// 读取响应
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 验证响应
+	if (msg.head.bodysize > 0) {
+		*error = ERROR_INVALID_RESPONSE;
+		close(sockfd);
+		return false;
+	}
+
+	*error = msg.head.error;
+	return (*error == 0);
 }
 
 extern "C" bool waitpostdata(int sockfd, std::string& tagname, int timeout, unsigned int* error)

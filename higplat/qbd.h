@@ -41,6 +41,8 @@
 #define CODE_QFULL						36
 #define STRING_TOO_LONG					37
 #define BUFFER_TOO_SMALL				38
+#define ERROR_INVALID_PARAMETER			39
+#define ERROR_INVALID_RESPONSE			40
 
 #define SHIFT_MODE		1
 #define NORMAL_MODE		0

@@ -512,208 +512,196 @@ extern "C" unsigned int GetLastErrorQ()
 
 extern "C" int connectgplat(const char* server, int port)
 {
-	int sockfd = unblock_connect(server, port, 2);
-	if (sockfd < 0)
-	{
-		printf("connect to gplat failed\n");
+	// 参数校验
+	if (!server || port <= 0 || port > 65535) {
+		fprintf(stderr, "[ERROR] Invalid server address or port number\n");
 		return -1;
 	}
-	else
-	{
-		setblocking(sockfd);	//后面用阻塞模式读写SOCKET
-		printf("connect to gplat success\n");
-		return sockfd;
+
+	// 建立非阻塞连接
+	int sockfd = unblock_connect(server, port, 2);  // 2秒超时
+	if (sockfd < 0) {
+		fprintf(stderr, "[ERROR] Connection to %s:%d failed: %s\n",
+			server, port, strerror(errno));
+		return -1;
 	}
+
+	// 设置为阻塞模式
+	if (!setblocking(sockfd)) {
+		fprintf(stderr, "[WARNING] Failed to set blocking mode for socket %d\n", sockfd);
+		// 继续使用，非致命错误
+	}
+
+	printf("[INFO] Connected to gplat server %s:%d (fd=%d)\n", server, port, sockfd);
+	return sockfd;
 }
 
 extern "C" bool readq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error)
 {
-	bool   fSuccess = false;
-	int  cbBytesRead, cbWritten;
-	MSGSTRUCT     msg;
-
-	msg.head.id = READQ;
-	strcpy(msg.head.qname, qname);
-	msg.head.datasize = actsize;
-	msg.head.bodysize = 0;
-
-	if (msg.head.bodysize > MAXMSGLEN)
-	{
-		*error = ERROR_PARAMETER_SIZE;
+	// 参数校验
+	if (!qname || !record || !error || actsize <= 0) {
+		*error = ERROR_INVALID_PARAMETER;
 		return false;
 	}
 
-	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
-	{
-		fSuccess = true;
-	}
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = READQ;
+	msg.head.datasize = actsize;
+	msg.head.bodysize = 0;
 
-	if (!fSuccess)
-	{
-		printf("send_all failed\n");
+	// 安全拷贝队列名
+	strncpy(msg.head.qname, qname, sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	// 发送请求
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
 		*error = errno;
 		close(sockfd);
 		return false;
 	}
-	else
-	{
-		// Read client requests.
-		cbBytesRead = readn(sockfd, &msg, sizeof(MSGHEAD));
 
-		if (cbBytesRead < 0)
-		{
-			printf("readn failed\n");
+	// 读取响应头
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 检查错误码
+	*error = msg.head.error;
+	if (*error != 0) {
+		return false;
+	}
+
+	// 验证数据大小
+	if (msg.head.bodysize > actsize) {
+		*error = ERROR_BUFFER_TOO_SMALL;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取数据体（如果有）
+	if (msg.head.bodysize > 0) {
+		if (readn(sockfd, record, msg.head.bodysize) < 0) {
 			*error = errno;
 			close(sockfd);
 			return false;
 		}
-
-		if (msg.head.bodysize > 0)
-		{
-			cbBytesRead = readn(sockfd, msg.body, msg.head.bodysize);
-			if (cbBytesRead < 0)
-			{
-				printf("readn failed\n");
-				*error = errno;
-				close(sockfd);
-				return false;
-			}
-		}
-
-		*error = msg.head.error;
-		if (*error != 0)
-			return false;
-
-		memcpy(record, msg.body, msg.head.bodysize);
-		return true;
 	}
+
 	return true;
 }
 
 extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error)
 {
-	bool   fSuccess = false;
-	int  cbBytesRead, cbWritten;
-	MSGSTRUCT     msg;
+	// 参数校验
+	if (!qname || !record || !error || actsize <= 0) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
 
-	msg.head.id = WRITEQ;
-	strcpy(msg.head.qname, qname);
-	msg.head.datasize = actsize;
-	msg.head.bodysize = actsize;
-
-	if (msg.head.bodysize > MAXMSGLEN)
-	{
+	if (actsize > MAXMSGLEN) {
 		*error = ERROR_PARAMETER_SIZE;
 		return false;
 	}
 
-	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
-	{
-		if (send_all(sockfd, record, actsize) > 0)
-		{
-			fSuccess = true;
-		}
-		else
-		{
-			fSuccess = false;
-		}
-	}
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = WRITEQ;
+	msg.head.datasize = actsize;
+	msg.head.bodysize = actsize;
 
-	if (!fSuccess)
-	{
-		printf("send_all failed\n");
+	// 安全拷贝队列名
+	strncpy(msg.head.qname, qname, sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	// 发送消息头和数据
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0 ||
+		send_all(sockfd, record, actsize) <= 0) {
 		*error = errno;
 		close(sockfd);
 		return false;
 	}
-	else
-	{
-		// Read client requests.
-		cbBytesRead = readn(sockfd, &msg, sizeof(MSGHEAD));
 
-		if (cbBytesRead < 0)
-		{
-			printf("readn failed\n");
-			*error = errno;
-			close(sockfd);
-			return false;
-		}
-
-		if (msg.head.bodysize > 0)
-		{
-			printf("error: 应答电文不可能有电文体\n");
-			close(sockfd);
-			return false;
-		}
-
-		*error = msg.head.error;
-		if (*error != 0)
-			return false;
+	// 读取响应
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
 	}
-	return true;
+
+	// 验证响应
+	if (msg.head.bodysize > 0) {
+		*error = ERROR_INVALID_RESPONSE;
+		close(sockfd);
+		return false;
+	}
+
+	*error = msg.head.error;
+	return (*error == 0);
 }
 
 extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error, timespec* timestamp)
 {
-	bool   fSuccess = false;
-	int  cbBytesRead, cbWritten;
-	MSGSTRUCT     msg;
-
-	msg.head.id = READB;
-	strcpy(msg.head.qname, "BOARD");
-	strcpy(msg.head.itemname, tagname);
-	msg.head.datasize = actsize;
-	msg.head.bodysize = 0;
-
-	if (msg.head.bodysize > MAXMSGLEN)
-	{
-		*error = ERROR_PARAMETER_SIZE;
+	// 参数校验
+	if (!tagname || !value || !error || actsize <= 0) {
+		*error = ERROR_INVALID_PARAMETER;
 		return false;
 	}
 
-	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) > 0)
-	{
-		fSuccess = true;
-	}
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = READB;
+	msg.head.datasize = actsize;
+	msg.head.bodysize = 0;
 
-	if (!fSuccess)
-	{
-		printf("send_all failed\n");
+	// 安全拷贝字符串
+	strncpy(msg.head.qname, "BOARD", sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+
+	// 发送请求
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
 		*error = errno;
 		close(sockfd);
 		return false;
 	}
-	else
-	{
-		// Read client requests.
-		cbBytesRead = readn(sockfd, &msg, sizeof(MSGHEAD));
 
-		if (cbBytesRead < 0)
-		{
-			printf("readn failed\n");
+	// 读取响应头
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 检查错误码
+	*error = msg.head.error;
+	if (*error != 0) {
+		return false;
+	}
+
+	// 验证数据大小
+	if (msg.head.bodysize > actsize) {
+		*error = ERROR_BUFFER_TOO_SMALL;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取数据体（如果有）
+	if (msg.head.bodysize > 0) {
+		if (readn(sockfd, value, msg.head.bodysize) < 0) {
 			*error = errno;
 			close(sockfd);
 			return false;
 		}
+	}
 
-		if (msg.head.bodysize > 0)
-		{
-			cbBytesRead = readn(sockfd, msg.body, msg.head.bodysize);
-			if (cbBytesRead < 0)
-			{
-				printf("readn failed\n");
-				*error = errno;
-				close(sockfd);
-				return false;
-			}
-		}
-
-		*error = msg.head.error;
-		if (*error != 0)
-			return false;
-
-		memcpy(value, msg.body, msg.head.bodysize);
-		if (timestamp != 0) *timestamp = msg.head.timestamp;
+	// 返回时间戳（如果请求）
+	if (timestamp) {
+		*timestamp = msg.head.timestamp;
 	}
 
 	return true;

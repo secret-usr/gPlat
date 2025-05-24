@@ -48,9 +48,9 @@ pid_t   ngx_pid;                //当前进程的pid
 pid_t   ngx_parent;             //父进程的pid
 int     ngx_process;            //进程类型，比如master,worker进程等
 //gyb
-//int     g_stopEvent;            //标志程序退出,0不退出1，退出
-int     g_stopEventChild;         //子进程退出标志,0不退出1，退出
-int     g_stopEventMain;          //主程序退出标志,0不退出1，退出
+//int     g_stopEvent;            //标志程序退出,0不退出1退出
+int     g_stopEventChild;         //子进程退出标志,0不退出1退出
+int     g_stopEventMain;          //主程序退出标志,0不退出1退出
 
 //gyb 控制子进程退出的socketpair
 int sockpair[2];

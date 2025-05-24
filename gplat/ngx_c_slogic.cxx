@@ -684,6 +684,7 @@ void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader)
 
 	int usernumber = (int)subscribers.size();
 
+	//mark ?
 	if (usernumber > 500)
 	{
 		ngx_log_stderr(0, "ERROR:可能产生了事件风暴，请检查应用程序");
@@ -782,6 +783,51 @@ void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader)
 				p_memory->FreeMemory(p_sendbuf);	//释放内存
 				break;
 			}
+		}
+	}
+}
+
+void CLogicSocket::NotifyTimerSubscriber(std::string timerName)
+{
+	const auto& subscribers = m_subscriber.GetSubscriber(timerName);
+	if (subscribers.empty()) {
+		return;
+	}
+
+	CMemory* p_memory = CMemory::GetInstance();
+	for (auto subscriber : subscribers)
+	{
+		char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader, false);//准备发送的格式，这里是消息头+包头
+		//b)填充消息头
+		//a)先填写消息头内容
+		LPSTRUC_MSG_HEADER ptmpMsgHeader = (LPSTRUC_MSG_HEADER)p_sendbuf;
+		lpngx_connection_t pConn = (lpngx_connection_t)(subscriber.subscriber);
+		ptmpMsgHeader->pConn = pConn;
+		ptmpMsgHeader->iCurrsequence = ptmpMsgHeader->pConn->iCurrsequence;
+		//c)填充包头
+		PPKGHEAD pPkgHead = (PPKGHEAD)(p_sendbuf + m_iLenMsgHeader);
+		pPkgHead->id = POST;	//发布事件
+		strncpy(pPkgHead->itemname, timerName.c_str(), sizeof(pPkgHead->itemname) - 1);
+		pPkgHead->itemname[sizeof(pPkgHead->itemname) - 1] = '\0';  // 确保字符串终止
+		pPkgHead->bodysize = 0;	//防御性编程，只发布事件，不发布数据
+
+		//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程
+		CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
+
+		if (pConn->m_bWaitingTimeout)
+		{
+			pConn->m_bWaitingTimeout = false;
+			pConn->StopTimeoutTimer();
+		}
+
+		if (pConn->m_bWaitingPost)
+		{
+			pConn->m_bWaitingPost = false;
+			msgSend(p_sendbuf);
+		}
+		else
+		{
+			pConn->m_listPost.push_back(p_sendbuf);
 		}
 	}
 }

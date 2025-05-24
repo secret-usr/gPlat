@@ -70,9 +70,10 @@ public:
         }
 	}
 
-    TimerID addTimer(uint64_t delay_ms, TimerCallback callback, void * user) {
+    TimerID addTimer(uint64_t delay_ms, uint64_t interval_ms, TimerCallback callback, void * user) {
         int timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
         if (timer_fd == -1) {
+			std::cerr << "Failed to create timerfd: " << strerror(errno) << std::endl;
             return -1;
         }
 
@@ -80,10 +81,11 @@ public:
         struct itimerspec its {};
         its.it_value.tv_sec = delay_ms / 1000;
         its.it_value.tv_nsec = (delay_ms % 1000) * 1000000;
-        its.it_interval.tv_sec = 0;
-        its.it_interval.tv_nsec = 0;
+        its.it_interval.tv_sec = interval_ms / 1000;      // 关键修改：设置间隔
+        its.it_interval.tv_nsec = (interval_ms % 1000) * 1000000;
 
         if (timerfd_settime(timer_fd, 0, &its, nullptr) == -1) {
+			std::cerr << "Failed to set timerfd time: " << strerror(errno) << std::endl;
             close(timer_fd);
             return -1;
         }
@@ -92,6 +94,8 @@ public:
         event->fd = timer_fd;
         event->callback = std::move(callback);
         event->expire = getCurrentMs() + delay_ms;
+        event->interval_ms = interval_ms;
+        event->is_periodic = (interval_ms > 0);
 		event->user = user;
 
         std::lock_guard<std::mutex> lock(mutex_);
@@ -160,6 +164,8 @@ private:
         int fd;
         TimerCallback callback;
         uint64_t expire;
+        uint64_t interval_ms;  // 新增：触发间隔（0表示单次）
+        bool is_periodic;      // 新增：是否周期性定时器
 		void* user;
     };
 
@@ -201,6 +207,7 @@ private:
                     // 处理唤醒事件
                     uint64_t dummy;
                     read(wakeup_fd_, &dummy, sizeof(dummy));
+                    if (shutdown_) break;  // 检查是否退出
                     continue;
                 }
 
@@ -213,18 +220,39 @@ private:
                 // 执行回调
                 event->callback(event->user);
 
-                // 清理资源
-                std::lock_guard<std::mutex> lock(mutex_);
-                auto it = timer_map_.find(event->fd);
-                if (it != timer_map_.end()) {
-                    timer_map_.erase(it);
-                    heap_.erase(std::find(heap_.begin(), heap_.end(), it->second));
+                if (event->is_periodic) {
+                    // 更新下次触发时间
+                    event->expire = getCurrentMs() + event->interval_ms;
+
+                    // 重新设置系统定时器
+                    struct itimerspec its {};
+                    its.it_value.tv_sec = event->interval_ms / 1000;
+                    its.it_value.tv_nsec = (event->interval_ms % 1000) * 1000000;
+                    its.it_interval = its.it_value;  // 保持相同间隔
+                    timerfd_settime(event->fd, 0, &its, nullptr);
+
+                    // 不需要从堆中移除，保持激活状态
                 }
-                close(event->fd);
+                else {
+                    // 清理资源
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    auto it = timer_map_.find(event->fd);
+                    if (it != timer_map_.end()) {
+                        timer_map_.erase(it);
+                        heap_.erase(std::find(heap_.begin(), heap_.end(), it->second));
+                    }
+                    close(event->fd);
+                }
             }
+
+            // 重新调整堆结构（周期性定时器时间已更新）
+            std::make_heap(heap_.begin(), heap_.end(), TimerCompare());
 
             // 处理可能漏掉的超时事件
             std::lock_guard<std::mutex> lock(mutex_);
+            // 如果担心性能影响，可以优化为：只在检测到时间间隔较大时执行完整检查
+            //uint64_t now = getCurrentMs();
+            //if (!heap_.empty() && (now - heap_.front()->expire) > 5 /*ms*/) {
             while (!heap_.empty() && heap_.front()->expire <= getCurrentMs()) {
                 auto event = heap_.front();
                 std::pop_heap(heap_.begin(), heap_.end(), TimerCompare());
@@ -242,6 +270,7 @@ private:
                 // 关闭文件描述符
                 close(event->fd);
             }
+            //}
         }
     }
 

@@ -19,7 +19,7 @@ int main()
 {
     // 创建并启动线程
     std::thread worker1(threadFunction1);
-    std::thread worker2(threadFunction2);
+    //std::thread worker2(threadFunction2);
 
     // 或者分离线程让它独立运行
     //worker.detach();
@@ -41,7 +41,7 @@ int main()
 
     // 如果需要等待线程完成（虽然这个线程是无限循环）
     worker1.join();
-	worker2.join(); 
+	//worker2.join(); 
 
     std::cout << "main thread exit" << std::endl;
 

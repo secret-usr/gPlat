@@ -220,7 +220,29 @@ static void ngx_worker_process_init(int inum)
 	//启动定时器的线程，率先创建，至少要比和socket相关的内容优先
 	try
 	{
+		//启动定时器线程
 		g_tm.start();
+
+		//启动1秒定时器
+		g_tm.addTimer(1000, 1000, [](void* user) {
+			std::cout << "1秒定时器时间到" << std::endl;
+			g_socket.NotifyTimerSubscriber("timer_1s"); //通知定时器到达了
+			},
+			nullptr);
+
+		//启动3秒定时器
+		g_tm.addTimer(3000, 3000, [](void* user) {
+			std::cout << "3秒定时器时间到" << std::endl;
+			g_socket.NotifyTimerSubscriber("timer_3s"); //通知定时器到达了
+			},
+			nullptr);
+
+		//启动5秒定时器
+		g_tm.addTimer(5000, 5000, [](void* user) {
+			std::cout << "5秒定时器时间到" << std::endl;
+			g_socket.NotifyTimerSubscriber("timer_5s"); //通知定时器到达了
+			},
+			nullptr);
 	}
 	catch (const std::exception& e) {
 		std::cerr << "Error: " << e.what() << std::endl;

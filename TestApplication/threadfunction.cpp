@@ -16,11 +16,14 @@ void threadFunction1() {
 
     unsigned int error;
     subscribe(conngplat, "int1", &error);
+    subscribe(conngplat, "timer_1s", &error);
+    subscribe(conngplat, "timer_3s", &error);
+    subscribe(conngplat, "timer_5s", &error);
 
     int a = 0;
     std::string eventname;
     while (g_running) {  // 检查全局运行标志 {
-        waitpostdata(conngplat, eventname, 1000, &error); // 等待数据到达
+        waitpostdata(conngplat, eventname, 10000, &error); // 等待数据到达
         printf("event received: %s error=%d\n", eventname.c_str(), error);
         if (eventname == "int1") {
             int a = 0;

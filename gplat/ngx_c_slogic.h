@@ -31,6 +31,7 @@ public:
 	bool HandlePostWait(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength);
 
 	void NotifySubscriber(std::string tagName, char* pPkgHeader);
+	void NotifyTimerSubscriber(std::string timerName);
 
 public:
 	virtual void threadRecvProcFunc(char *pMsgBuf);

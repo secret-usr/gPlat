@@ -198,12 +198,12 @@ private:
                 }
             }
 
-			std::cout << "timeout=" << timeout << std::endl;
+            std::cout << "timeout=" << timeout << std::endl;
 
-            int nfds = epoll_wait(epoll_fd_, events, MAX_EVENTS, timeout);
+            int nfds = epoll_wait(epoll_fd_, events, MAX_EVENTS, -1);
             if (nfds == -1) {
                 if (errno == EINTR) continue;
-				std::cerr << "epoll_wait error: " << strerror(errno) << std::endl;
+                std::cerr << "epoll_wait error: " << strerror(errno) << std::endl;
                 break; // 发生错误
             }
 
@@ -217,7 +217,7 @@ private:
                 }
 
                 //auto* event = static_cast<TimerEvent*>(events[i].data.ptr);
-				//强化指针转换安全性：使用shared_ptr
+                //强化指针转换安全性：使用shared_ptr
                 auto* raw_event = static_cast<TimerEvent*>(events[i].data.ptr);
                 std::shared_ptr<TimerEvent> event;
 
@@ -240,7 +240,7 @@ private:
                 // 执行回调
                 event->callback(event->user);
 
-				std::cout << "come 1" << std::endl;
+                std::cout << "come 1" << std::endl;
 
                 if (event->is_periodic) {
                     std::cout << "come 2" << std::endl;
@@ -278,7 +278,7 @@ private:
                     else
                     {
                         std::cerr << "timer_map_ not found!" << event->fd << std::endl;
-					}
+                    }
 
                     // 4. 重置系统定时器
                     //struct itimerspec its {};
@@ -304,83 +304,86 @@ private:
                 }
             }
 
-			std::cout << "come 5" << std::endl;
 
-            // 处理可能漏掉的超时事件
-            std::lock_guard<std::mutex> lock(mutex_);
-            // 如果担心性能影响，可以优化为：只在检测到时间间隔较大时执行完整检查
-            //uint64_t now = getCurrentMs();
-            //if (!heap_.empty() && (now - heap_.front()->expire) > 5 /*ms*/) {
-            while (!heap_.empty() && heap_.front()->expire <= getCurrentMs()) {
-                std::cout << "come 6" << std::endl;
-                auto event = heap_.front();
-                std::pop_heap(heap_.begin(), heap_.end(), TimerCompare());
-                heap_.pop_back();
 
-                std::cout << "come 7" << std::endl;
 
-                // 从epoll中删除
-                epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, event->fd, nullptr);
+            //std::cout << "come 5" << std::endl;
 
-                // 执行回调
-                event->callback(event->user);
+   //         // 处理可能漏掉的超时事件
+   //         std::lock_guard<std::mutex> lock(mutex_);
+   //         // 如果担心性能影响，可以优化为：只在检测到时间间隔较大时执行完整检查
+   //         //uint64_t now = getCurrentMs();
+   //         //if (!heap_.empty() && (now - heap_.front()->expire) > 5 /*ms*/) {
+   //         while (!heap_.empty() && heap_.front()->expire <= getCurrentMs()) {
+   //             std::cout << "come 6" << std::endl;
+   //             auto event = heap_.front();
+   //             std::pop_heap(heap_.begin(), heap_.end(), TimerCompare());
+   //             heap_.pop_back();
 
-                std::cout << "come 9" << std::endl;
+   //             std::cout << "come 7" << std::endl;
 
-                std::cout << "处理了可能漏掉的超时事件";
+   //             // 从epoll中删除
+   //             epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, event->fd, nullptr);
 
-                if (event->is_periodic) {
-                    std::cout << "come 10" << std::endl;
-                    // 原子性更新下次触发时间（避免竞争）
-                    //std::lock_guard<std::mutex> lock(mutex_);
-                    std::cout << "come 11" << std::endl;
+   //             // 执行回调
+   //             event->callback(event->user);
 
-                    // 安全转换：从map中获取shared_ptr
-                    if (auto it = timer_map_.find(event->fd); it != timer_map_.end()) {
-                        auto shared_event = it->second;
+   //             std::cout << "come 9" << std::endl;
 
-                        // 从堆中移除旧条目
-                        auto heap_it = std::find(heap_.begin(), heap_.end(), shared_event);
+   //             std::cout << "处理了可能漏掉的超时事件";
 
-                        if (heap_it != heap_.end()) {
-                            heap_.erase(heap_it);
+   //             if (event->is_periodic) {
+   //                 std::cout << "come 10" << std::endl;
+   //                 // 原子性更新下次触发时间（避免竞争）
+   //                 //std::lock_guard<std::mutex> lock(mutex_);
+   //                 std::cout << "come 11" << std::endl;
 
-                            // 更新并重新插入（使用智能指针）
-                            shared_event->expire = getCurrentMs() + shared_event->interval_ms;
-                            heap_.push_back(shared_event);
-                            std::push_heap(heap_.begin(), heap_.end(), TimerCompare());
+   //                 // 安全转换：从map中获取shared_ptr
+   //                 if (auto it = timer_map_.find(event->fd); it != timer_map_.end()) {
+   //                     auto shared_event = it->second;
 
-                            std::cout << "---------------------------------------";
-                            for (const auto& ev : heap_) {
-                                std::cout << ev->fd << "->" << ev->expire << " ";
-                            }
-                            std::cout << std::endl;
-                        }
-                    }
+   //                     // 从堆中移除旧条目
+   //                     auto heap_it = std::find(heap_.begin(), heap_.end(), shared_event);
 
-                    // 4. 重置系统定时器
-                    //struct itimerspec its {};
-                    //its.it_value.tv_sec = event->interval_ms / 1000;
-                    //its.it_value.tv_nsec = (event->interval_ms % 1000) * 1000000;
-                    //its.it_interval = its.it_value;  // 保持相同间隔
-                    //if (timerfd_settime(event->fd, 0, &its, nullptr) == -1) {
-                    //    std::cerr << "Failed to set timerfd time: " << strerror(errno) << std::endl;
-                    //}
-                }
-                else {
-                    std::cout << "come 12" << std::endl;
-                    removeTimer(event->fd);
+   //                     if (heap_it != heap_.end()) {
+   //                         heap_.erase(heap_it);
 
-                    // 重新调整堆结构（周期性定时器时间已更新）
-                    std::make_heap(heap_.begin(), heap_.end(), TimerCompare());
+   //                         // 更新并重新插入（使用智能指针）
+   //                         shared_event->expire = getCurrentMs() + shared_event->interval_ms;
+   //                         heap_.push_back(shared_event);
+   //                         std::push_heap(heap_.begin(), heap_.end(), TimerCompare());
 
-                    std::cout << "##################################";
-                    for (const auto& ev : heap_) {
-                        std::cout << ev->fd << "->" << ev->expire << " ";
-                    }
-                    std::cout << std::endl;
-                }
-            }
+   //                         std::cout << "---------------------------------------";
+   //                         for (const auto& ev : heap_) {
+   //                             std::cout << ev->fd << "->" << ev->expire << " ";
+   //                         }
+   //                         std::cout << std::endl;
+   //                     }
+   //                 }
+
+   //                 // 4. 重置系统定时器
+   //                 //struct itimerspec its {};
+   //                 //its.it_value.tv_sec = event->interval_ms / 1000;
+   //                 //its.it_value.tv_nsec = (event->interval_ms % 1000) * 1000000;
+   //                 //its.it_interval = its.it_value;  // 保持相同间隔
+   //                 //if (timerfd_settime(event->fd, 0, &its, nullptr) == -1) {
+   //                 //    std::cerr << "Failed to set timerfd time: " << strerror(errno) << std::endl;
+   //                 //}
+   //             }
+   //             else {
+   //                 std::cout << "come 12" << std::endl;
+   //                 removeTimer(event->fd);
+
+   //                 // 重新调整堆结构（周期性定时器时间已更新）
+   //                 std::make_heap(heap_.begin(), heap_.end(), TimerCompare());
+
+   //                 std::cout << "##################################";
+   //                 for (const auto& ev : heap_) {
+   //                     std::cout << ev->fd << "->" << ev->expire << " ";
+   //                 }
+   //                 std::cout << std::endl;
+   //             }
+   //         }
             //}
         }
     }

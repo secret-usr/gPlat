@@ -23,7 +23,7 @@ void threadFunction1() {
     int a = 0;
     std::string eventname;
     while (g_running) {  // 检查全局运行标志 {
-        waitpostdata(conngplat, eventname, 10000, &error); // 等待数据到达
+        waitpostdata(conngplat, eventname, -1, &error); // 等待数据到达
         printf("event received: %s error=%d\n", eventname.c_str(), error);
         if (eventname == "int1") {
             int a = 0;

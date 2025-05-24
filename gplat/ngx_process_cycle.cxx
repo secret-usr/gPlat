@@ -230,12 +230,18 @@ static void ngx_worker_process_init(int inum)
 			},
 			nullptr);
 
+		// 休眠300毫秒
+		//std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
 		//启动3秒定时器
 		g_tm.addTimer(3000, 3000, [](void* user) {
 			std::cout << "3秒定时器时间到" << std::endl;
 			g_socket.NotifyTimerSubscriber("timer_3s"); //通知定时器到达了
 			},
 			nullptr);
+
+		// 休眠300毫秒
+		//std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
 		//启动5秒定时器
 		g_tm.addTimer(5000, 5000, [](void* user) {

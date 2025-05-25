@@ -924,7 +924,7 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 void ngx_connection_s::StartTimeoutTimer(int dwMilliseconds)
 {
 	//mark 使用了全局变量
-	m_timerID = g_tm.addTimer(dwMilliseconds, 0, [](void* user) {
+	m_timerID = g_tm.add_once(dwMilliseconds, [](void* user) {
 		std::cout << "超时时间到" << std::endl;
 
 		lpngx_connection_t pConn = (lpngx_connection_t)user;
@@ -965,5 +965,5 @@ void ngx_connection_s::StopTimeoutTimer()
 		return;
 	}
 
-	g_tm.removeTimer(m_timerID); //删除定时器
+	g_tm.cancel(m_timerID); //删除定时器
 }

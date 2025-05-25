@@ -222,10 +222,10 @@ private:
                 std::shared_ptr<TimerEvent> event;
 
                 { // 加锁查找
-                    std::lock_guard<std::mutex> lock(mutex_);
-                    if (auto it = timer_map_.find(raw_event->fd); it != timer_map_.end()) {
-                        event = it->second; // 获取共享所有权
-                    }
+                    //std::lock_guard<std::mutex> lock(mutex_);
+                    //if (auto it = timer_map_.find(raw_event->fd); it != timer_map_.end()) {
+                    //    event = it->second; // 获取共享所有权
+                    //}
                 }
 
                 if (!event) {
@@ -250,35 +250,35 @@ private:
                     std::cout << "come 3" << std::endl;
 
                     // 安全转换：从map中获取shared_ptr
-                    if (auto it = timer_map_.find(event->fd); it != timer_map_.end()) {
-                        auto shared_event = it->second;
+                    //if (auto it = timer_map_.find(event->fd); it != timer_map_.end()) {
+                    //    auto shared_event = it->second;
 
-                        // 从堆中移除旧条目
-                        auto heap_it = std::find(heap_.begin(), heap_.end(), shared_event);
+                    //    // 从堆中移除旧条目
+                    //    auto heap_it = std::find(heap_.begin(), heap_.end(), shared_event);
 
-                        if (heap_it != heap_.end()) {
-                            heap_.erase(heap_it);
+                    //    if (heap_it != heap_.end()) {
+                    //        heap_.erase(heap_it);
 
-                            // 更新并重新插入（使用智能指针）
-                            shared_event->expire = getCurrentMs() + shared_event->interval_ms;
-                            heap_.push_back(shared_event);
-                            std::push_heap(heap_.begin(), heap_.end(), TimerCompare());
+                    //        // 更新并重新插入（使用智能指针）
+                    //        shared_event->expire = getCurrentMs() + shared_event->interval_ms;
+                    //        heap_.push_back(shared_event);
+                    //        std::push_heap(heap_.begin(), heap_.end(), TimerCompare());
 
-                            std::cout << "*******************************";
-                            for (const auto& ev : heap_) {
-                                std::cout << ev->fd << "->" << ev->expire << " ";
-                            }
-                            std::cout << std::endl;
-                        }
-                        else
-                        {
-                            std::cerr << "heap_ not found!" << event->fd << std::endl;
-                        }
-                    }
-                    else
-                    {
-                        std::cerr << "timer_map_ not found!" << event->fd << std::endl;
-                    }
+                    //        std::cout << "*******************************";
+                    //        for (const auto& ev : heap_) {
+                    //            std::cout << ev->fd << "->" << ev->expire << " ";
+                    //        }
+                    //        std::cout << std::endl;
+                    //    }
+                    //    else
+                    //    {
+                    //        std::cerr << "heap_ not found!" << event->fd << std::endl;
+                    //    }
+                    //}
+                    //else
+                    //{
+                    //    std::cerr << "timer_map_ not found!" << event->fd << std::endl;
+                    //}
 
                     // 4. 重置系统定时器
                     //struct itimerspec its {};

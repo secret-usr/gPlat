@@ -22,7 +22,8 @@
 #include "ngx_c_crc32.h"       //和crc32校验算法有关 
 #include "ngx_c_slogic.h"      //和socket通讯相关
 
-#include "../include/TimerManager.h"
+//#include "../include/TimerManager.h"
+#include "../include/timer_manager.h"
 
 //本文件用的函数声明
 static void freeresource();

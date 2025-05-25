@@ -14,7 +14,8 @@
 #include "ngx_comm.h"
 #include "ngx_global.h" //全局变量
 
-#include "../include/TimerManager.h" // Include the header file for the TimerManager class
+//#include "../include/TimerManager.h" // Include the header file for the TimerManager class
+#include "../include/timer_manager.h"
 extern TimerManager   g_tm;			//定时器全局对象
 
 //一些宏定义放在这里-----------------------------------------------------------
@@ -112,7 +113,7 @@ struct ngx_connection_s
 	std::list<char*> m_listPost;		// 待发送的事件列表
 
 private:
-	TimerManager::TimerID m_timerID{ -1 };	// 定时器ID
+	int m_timerID{ -1 };	// 定时器ID
 };
 
 //消息头，引入的目的是当收到数据包时，额外记录一些内容以备将来使用

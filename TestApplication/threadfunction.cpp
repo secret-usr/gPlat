@@ -18,7 +18,9 @@ void threadFunction1() {
 
     unsigned int error;
     subscribe(conngplat, "int1", &error);
+    subscribe(conngplat, "timer_500ms", &error);
     subscribe(conngplat, "timer_1s", &error);
+    subscribe(conngplat, "timer_2s", &error);
     subscribe(conngplat, "timer_3s", &error);
     subscribe(conngplat, "timer_5s", &error);
 

@@ -764,6 +764,124 @@ extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize
 	return (*error == 0);
 }
 
+extern "C" bool readb_string(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error, timespec* timestamp)
+{
+	// 参数校验
+	if (!tagname || !value || !error || actsize <= 0) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = READBSTRING;
+	msg.head.datasize = actsize;
+	msg.head.bodysize = 0;
+
+	// 安全拷贝字符串
+	strncpy(msg.head.qname, "BOARD", sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+
+	// 发送请求
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取响应头
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 检查错误码
+	*error = msg.head.error;
+	if (*error != 0) {
+		return false;
+	}
+
+	// 验证数据大小
+	if (msg.head.bodysize > actsize) {
+		*error = ERROR_BUFFER_TOO_SMALL;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取数据体（如果有）
+	if (msg.head.bodysize > 0) {
+		if (readn(sockfd, value, msg.head.bodysize) < 0) {
+			*error = errno;
+			close(sockfd);
+			return false;
+		}
+	}
+
+	// 返回时间戳（如果请求）
+	if (timestamp) {
+		*timestamp = msg.head.timestamp;
+	}
+
+	return true;
+}
+
+extern "C" bool writeb_string(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error)
+{
+	// 参数校验
+	if (!tagname || !value || !error || actsize <= 0) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	if (actsize > MAXMSGLEN) {
+		*error = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+	
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = WRITEBSTRING;
+	msg.head.datasize = actsize;
+	msg.head.bodysize = actsize;
+	msg.head.offset = 0;
+	msg.head.subsize = 0;
+
+	// 安全拷贝字符串
+	strncpy(msg.head.qname, "BOARD", sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0 ||
+		send_all(sockfd, value, actsize) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 接收响应
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 验证响应
+	if (msg.head.bodysize > 0) {
+		*error = ERROR_INVALID_RESPONSE;
+		close(sockfd);
+		return false;
+	}
+
+	*error = msg.head.error;
+	return (*error == 0);
+}
+
 extern "C" bool subscribe(int sockfd, const char* tagname, unsigned int* error)
 {
 	// 参数校验

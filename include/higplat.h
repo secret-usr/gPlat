@@ -155,6 +155,8 @@ extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize
 extern "C" bool subscribe(int sockfd, const char* tagname, unsigned int* error);
 extern "C" bool createtag(int sockfd, const char* tagname, int tagsize, void* type, int typesize, unsigned int* error);
 extern "C" bool waitpostdata(int sockfd, std::string& tagname, int timeout, unsigned int* error);
+extern "C" bool readb_string(int sockfd, const char* tagname, void* value, int actSize, unsigned int* error, timespec*timestamp=0);
+extern "C" bool writeb_string(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error);
 
 //DllImport BOOL __cdecl GetQueuePath(LPTSTR lpPath, size_t count);
 extern "C" bool CreateB(const char* lpFileName, int size);
@@ -198,11 +200,11 @@ extern "C" bool WriteQ(const char* lpDqName, void  *lpRecord, int actSize=0, con
 //DllImport BOOL __cdecl UnlockB( LPCTSTR lpBulletinName );
 //DllImport BOOL __cdecl ReadInfoB( LPCTSTR lpBulletinName, int* pTotalSize, int* pDataSize, int* pLeftSize, int* pItemNumint, int* buffSize, TCHAR ppBuff[][24]);
 extern "C" bool ReadB(const char* lpBoardName, const char* lpItemName, void* lpItem, int actSize, timespec* timestamp = 0);
-//DllImport BOOL __cdecl ReadB_String(LPCTSTR lpBulletinName, LPCTSTR lpItemName, VOID  *lpItem, int actSize, time_t *timestamp=0);
+extern "C" bool ReadB_String(const char* lpBulletinName, const char* lpItemName, void*lpItem, int actSize, timespec*timestamp=0);
 //DllImport BOOL __cdecl ReadB_String(HANDLE hServer, LPCTSTR lpBulletinName, LPCTSTR lpItemName, VOID  *lpItem, int actSize, DWORD * error, time_t *timestamp=0);
 //DllImport BOOL __cdecl ReadB( VOID * pBulletin, LPCTSTR lpItemName, VOID  *lpItem, int actSize, time_t *timestamp=0 );
 extern "C" bool WriteB(const char* lpBulletinName, const char* lpItemName, void* lpItem, int actSize, void* lpSubItem = 0, int actSubSize = 0);
-//DllImport BOOL __cdecl WriteB_String(LPCTSTR lpBulletinName, LPCTSTR lpItemName, VOID  *lpItem, int actSize, VOID  *lpSubItem = 0, int actSubSize = 0);
+extern "C" bool WriteB_String(const char* lpBulletinName, const char* lpItemName, void *lpItem, int actSize, void *lpSubItem = 0, int actSubSize = 0);
 //DllImport BOOL __cdecl WriteB_String(HANDLE hServer, LPCTSTR lpBulletinName, LPCTSTR lpItemName, VOID  *lpItem, int actSize, DWORD * error);
 //DllImport BOOL __cdecl WriteB_ReadBack( LPCTSTR lpBulletinName, LPCTSTR lpItemName, VOID  *lpItem, int actSize, VOID  *lpSubItem=0, int actSubSize=0 );
 //DllImport BOOL __cdecl WriteBOffSet( LPCTSTR lpBulletinName, LPCTSTR lpItemName, VOID  *lpItem, int actSize, int offSet, int actSubSize );

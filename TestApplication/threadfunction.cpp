@@ -1,8 +1,10 @@
 #include <thread>
 #include <string>
 #include <cstdio>
+#include <cstdlib>
 #include <atomic>
 #include <iostream>
+#include <string.h>
 
 #include "../include/hello.h"
 #include "../include/higplat.h"
@@ -23,7 +25,7 @@ void threadFunction1() {
     int a = 0;
     std::string eventname;
     while (g_running) {  // 检查全局运行标志 {
-        waitpostdata(conngplat, eventname, -1, &error); // 等待数据到达
+        waitpostdata(conngplat, eventname, 100, &error); // 等待数据到达
         printf("event received: %s error=%d\n", eventname.c_str(), error);
         if (eventname == "int1") {
             int a = 0;
@@ -54,4 +56,32 @@ void threadFunction2() {
     }
 
     printf("work thread exit\n");
+}
+
+void threadFunction3() {
+    int conngplat;
+    conngplat = connectgplat("127.0.0.1", 8777);
+    bool ret{ false };
+    unsigned int error;
+
+    int a = 0;
+    std::string eventname;
+    while (g_running) {
+		std::string suffix = std::to_string(a++);  
+        char str1[100] = "hello world, gyb loop=";
+		strcat(str1, suffix.c_str()); // 将数字转换为字符串并复制到 str1
+        ret = writeb_string(conngplat, "string1", str1, strlen(str1), &error); // 发送数据
+
+        char str2[1000] = { 0 };
+        ret = readb_string(conngplat, "string1", str2, sizeof(str2), &error); // 接收数据
+        if (ret) {
+            printf("readb_string str2=%s error=%d\n", str2, error);
+        } else {
+            printf("writeb_string failed, error=%d\n", error);
+		}
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+
+    printf("work thread exit\n");   
 }

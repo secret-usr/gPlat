@@ -95,7 +95,7 @@ static const handler statusHandler[] =
 	//ISFULLQ,
 	&CLogicSocket::noop,
 	//READQ,
-	& CLogicSocket::HandleReadQ,
+	&CLogicSocket::HandleReadQ,
 	//PEEKQ,
 	&CLogicSocket::noop,
 	//WRITEQ,
@@ -103,7 +103,7 @@ static const handler statusHandler[] =
 	 //READB,
 	 &CLogicSocket::HandleReadB,
 	 //READBSTRING,
-	 &CLogicSocket::noop,
+	 &CLogicSocket::HandleReadBString,
 	 //WRITEB,
 	 &CLogicSocket::HandleWriteB,
 	 //QDATA,
@@ -143,7 +143,7 @@ static const handler statusHandler[] =
 	 //POPARECORDQ,	//mark
 	 &CLogicSocket::noop,
 	 //WRITEBSTRING,	//mark
-	 &CLogicSocket::noop,
+	 &CLogicSocket::HandleWriteBString,
 	 //WRITETOL1,		//mark
 	 &CLogicSocket::noop,
 	 //SUBSCRIBE,		//mark
@@ -537,7 +537,7 @@ bool CLogicSocket::HandleWriteB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	{
 		pPkgHead->error = GetLastErrorQ();
 	}
-	
+
 	pPkgHead->bodysize = 0;
 
 	//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程，是不是有发送顺序的问题，假如在msgSend函数前切换线程
@@ -561,6 +561,105 @@ bool CLogicSocket::HandleWriteB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	//auto end = std::chrono::high_resolution_clock::now();
 	//auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 	//std::cout << "WriteB执行时间: " << duration.count() << " 微秒" << std::endl;
+
+	//发布订阅
+	if (ret)
+	{
+		NotifySubscriber(pPkgHead->itemname, pPkgHeader);
+	}
+
+	return true;
+}
+
+bool CLogicSocket::HandleReadBString(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
+{
+	//debug
+	//ngx_log_stderr(0, "执行了CLogicSocket::HandleReadB()!");
+
+	//(1)首先判断包体的合法性
+	if (pPkgHeader == NULL) //具体看客户端服务器约定，如果约定这个命令[msgCode]必须带包体，那么如果不带包体，就认为是恶意包，直接不处理    
+	{
+		return false;
+	}
+
+	timespec timestamp;
+
+	PPKGHEAD pPkgHead = (PPKGHEAD)pPkgHeader; //包头
+	bool ret;
+	int iLenPkgBody = pPkgHead->datasize;
+	//直接分配内存返回数据
+	CMemory* p_memory = CMemory::GetInstance();
+	char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + iLenPkgBody, false);//准备发送的格式，这里是消息头+包头+包体
+
+	if (ret = ReadB_String(pPkgHead->qname, pPkgHead->itemname, p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader, iLenPkgBody, &timestamp))
+	{
+		pPkgHead->error = 0;
+		pPkgHead->bodysize = pPkgHead->datasize;
+		pPkgHead->timestamp = timestamp;
+	}
+	else
+	{
+		pPkgHead->error = GetLastErrorQ();
+		pPkgHead->bodysize = 0;
+	}
+
+	//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程
+	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
+
+	//b)填充消息头
+	memcpy(p_sendbuf, pMsgHeader, m_iLenMsgHeader);           //消息头直接拷贝到这里来
+	//c)填充包头
+	memcpy(p_sendbuf + m_iLenMsgHeader, pPkgHeader, m_iLenPkgHeader);         //包头直接拷贝到这里来
+	//c)填充包体
+	//这里不用了，上面ReadQ已经填充了包体
+
+	//f)发送数据包
+	msgSend(p_sendbuf);
+
+	return true;
+}
+
+bool CLogicSocket::HandleWriteBString(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
+{
+	//debug
+	//ngx_log_stderr(0, "执行了CLogicSocket::HandleWriteB()!");
+
+	//(1)首先判断包体的合法性
+	if (pPkgHeader == NULL) //具体看客户端服务器约定，如果约定这个命令[msgCode]必须带包体，那么如果不带包体，就认为是恶意包，直接不处理    
+	{
+		return false;
+	}
+
+	PPKGHEAD pPkgHead = (PPKGHEAD)pPkgHeader; //包头
+	bool ret;
+
+	if (ret = WriteB_String(pPkgHead->qname, pPkgHead->itemname, (char*)pPkgHead + sizeof(PKGHEAD), pPkgHead->datasize))
+	{
+		pPkgHead->error = 0;
+	}
+	else
+	{
+		pPkgHead->error = GetLastErrorQ();
+	}
+
+	pPkgHead->bodysize = 0;
+
+	//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程，是不是有发送顺序的问题，假如在msgSend函数前切换线程
+	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
+
+	int iLenPkgBody = 0;
+	CMemory* p_memory = CMemory::GetInstance();
+	char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + iLenPkgBody, false);//准备发送的格式，这里是消息头+包头+包体
+	//b)填充消息头
+	memcpy(p_sendbuf, pMsgHeader, m_iLenMsgHeader);           //消息头直接拷贝到这里来
+	//c)填充包头
+	memcpy(p_sendbuf + m_iLenMsgHeader, pPkgHeader, m_iLenPkgHeader);         //包头直接拷贝到这里来
+
+	//d)填充包体
+	LPSTRUCT_REGISTER p_sendInfo = (LPSTRUCT_REGISTER)(p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader);	//跳过消息头，跳过包头，就是包体了
+
+	//f)发送数据包
+	msgSend(p_sendbuf);
 
 	//发布订阅
 	if (ret)
@@ -732,51 +831,51 @@ void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader)
 					pConn->m_listPost.push_back(p_sendbuf);
 				}
 				break;
-	//		case EVENTID::POST_DELAY:
-	//			NotifySubscriberOnDelayTime(subscriber.eventname, subscriber.eventarg, (ClientContext*)subscriber.subscriber, pOverlapBuff);
-	//			break;
-			/*
-			case EVENTID::NOT_EQUAL_ZERO:
-				value = *(SHORT*)pMsg->body;
-				if (value != 0)
-				{
-					TCHAR itemname[32];
-					wcscpy_s(itemname, pMsg->head.itemname);
-					wcscpy_s(pMsg->head.itemname, subscriber.eventname);	//换成用户定义的事件名
-					SendMsg((ClientContext*)subscriber.subscriber, pOverlapBuff);
-					wcscpy_s(pMsg->head.itemname, itemname);				//还原			
-				}
-				else
-					pOverlapBuff->DecRef();
-				break;
-			case EVENTID::NOT_EQUAL_ZERO | EVENTID::POST_DELAY:
-				value = *(SHORT*)pMsg->body;
-				if (value != 0)
-					NotifySubscriberOnDelayTime(subscriber.eventname, subscriber.eventarg, (ClientContext*)subscriber.subscriber, pOverlapBuff);
-				else
-					pOverlapBuff->DecRef();
-				break;
-			case EVENTID::EQUAL_ZERO:
-				value = *(SHORT*)pMsg->body;
-				if (value == 0)
-				{
-					TCHAR itemname[32];
-					wcscpy_s(itemname, pMsg->head.itemname);
-					wcscpy_s(pMsg->head.itemname, subscriber.eventname);	//换成用户定义的事件名
-					SendMsg((ClientContext*)subscriber.subscriber, pOverlapBuff);
-					wcscpy_s(pMsg->head.itemname, itemname);				//还原			
-				}
-				else
-					pOverlapBuff->DecRef();
-				break;
-			case EVENTID::EQUAL_ZERO | EVENTID::POST_DELAY:
-				value = *(SHORT*)pMsg->body;
-				if (value == 0)
-					NotifySubscriberOnDelayTime(subscriber.eventname, subscriber.eventarg, (ClientContext*)subscriber.subscriber, pOverlapBuff);
-				else
-					pOverlapBuff->DecRef();
-				break;
-			*/
+				//		case EVENTID::POST_DELAY:
+				//			NotifySubscriberOnDelayTime(subscriber.eventname, subscriber.eventarg, (ClientContext*)subscriber.subscriber, pOverlapBuff);
+				//			break;
+						/*
+						case EVENTID::NOT_EQUAL_ZERO:
+							value = *(SHORT*)pMsg->body;
+							if (value != 0)
+							{
+								TCHAR itemname[32];
+								wcscpy_s(itemname, pMsg->head.itemname);
+								wcscpy_s(pMsg->head.itemname, subscriber.eventname);	//换成用户定义的事件名
+								SendMsg((ClientContext*)subscriber.subscriber, pOverlapBuff);
+								wcscpy_s(pMsg->head.itemname, itemname);				//还原
+							}
+							else
+								pOverlapBuff->DecRef();
+							break;
+						case EVENTID::NOT_EQUAL_ZERO | EVENTID::POST_DELAY:
+							value = *(SHORT*)pMsg->body;
+							if (value != 0)
+								NotifySubscriberOnDelayTime(subscriber.eventname, subscriber.eventarg, (ClientContext*)subscriber.subscriber, pOverlapBuff);
+							else
+								pOverlapBuff->DecRef();
+							break;
+						case EVENTID::EQUAL_ZERO:
+							value = *(SHORT*)pMsg->body;
+							if (value == 0)
+							{
+								TCHAR itemname[32];
+								wcscpy_s(itemname, pMsg->head.itemname);
+								wcscpy_s(pMsg->head.itemname, subscriber.eventname);	//换成用户定义的事件名
+								SendMsg((ClientContext*)subscriber.subscriber, pOverlapBuff);
+								wcscpy_s(pMsg->head.itemname, itemname);				//还原
+							}
+							else
+								pOverlapBuff->DecRef();
+							break;
+						case EVENTID::EQUAL_ZERO | EVENTID::POST_DELAY:
+							value = *(SHORT*)pMsg->body;
+							if (value == 0)
+								NotifySubscriberOnDelayTime(subscriber.eventname, subscriber.eventarg, (ClientContext*)subscriber.subscriber, pOverlapBuff);
+							else
+								pOverlapBuff->DecRef();
+							break;
+						*/
 			default:
 				//pOverlapBuff->DecRef();
 				ngx_log_stderr(0, "ERROR:unknown eventid");

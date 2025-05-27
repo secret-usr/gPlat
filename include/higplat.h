@@ -86,6 +86,7 @@ struct BOARD_INDEX_STRUCT
 	char  itemname[MAXDQNAMELENTH];
 	int    startpos;		// reference to the beginning of date part.
 	int    itemsize;
+	int    strlenth;		// 字符串长度(不包括'\0')
 	bool   erased;			// 表删除标志
 	timespec timestamp;		// write time
 	int	   typeaddr;		// 类型起始地址
@@ -157,6 +158,8 @@ extern "C" bool createtag(int sockfd, const char* tagname, int tagsize, void* ty
 extern "C" bool waitpostdata(int sockfd, std::string& tagname, int timeout, unsigned int* error);
 extern "C" bool readb_string(int sockfd, const char* tagname, void* value, int actSize, unsigned int* error, timespec*timestamp=0);
 extern "C" bool writeb_string(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error);
+extern "C" bool readb_string2(int sockfd, const char* tagname, std::string& value, unsigned int* error, timespec* timestamp = 0);
+extern "C" bool writeb_string2(int sockfd, const char* tagname, std::string& value, unsigned int* error);
 
 //DllImport BOOL __cdecl GetQueuePath(LPTSTR lpPath, size_t count);
 extern "C" bool CreateB(const char* lpFileName, int size);

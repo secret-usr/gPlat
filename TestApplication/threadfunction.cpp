@@ -15,7 +15,7 @@ extern std::atomic<bool> g_running;  // 控制线程运行的标志
 void threadFunction1() {
     int conngplat;
     conngplat = connectgplat("127.0.0.1", 8777);
-
+    bool ret{ false };
     unsigned int error;
     subscribe(conngplat, "int1", &error);
     subscribe(conngplat, "timer_500ms", &error);
@@ -28,14 +28,22 @@ void threadFunction1() {
     std::string eventname;
     while (g_running) {  // 检查全局运行标志 {
         waitpostdata(conngplat, eventname, 100, &error); // 等待数据到达
-        printf("event received: %s error=%d\n", eventname.c_str(), error);
+        if (eventname!="int1") {
+            printf("eventname=%s\n", eventname.c_str());
+		}
         if (eventname == "int1") {
             int a = 0;
-            readb(conngplat, "int1", &a, sizeof(a), &error); // 接收数据
-            printf("readb a=%d error=%d\n", a, error);
+            ret = readb(conngplat, "int1", &a, sizeof(a), &error); // 接收数据
+            if(!ret) {
+                printf("readb failed, error=%d\n", error);
+			}
+            //printf("readb a=%d error=%d\n", a, error);
         } else if (eventname == "int2") {
-            readb(conngplat, "int2", &a, sizeof(a), &error); // 接收数据
-            printf("readb b=%f error=%d\n", a, error);
+            ret = readb(conngplat, "int2", &a, sizeof(a), &error); // 接收数据
+            if (!ret) {
+                printf("readb failed, error=%d\n", error);
+            }
+            //printf("readb b=%f error=%d\n", a, error);
         }
     }
 
@@ -45,15 +53,18 @@ void threadFunction1() {
 void threadFunction2() {
     int conngplat;
     conngplat = connectgplat("127.0.0.1", 8777);
-
+    bool ret{ false };
     unsigned int error;
 
     int a = 0;
     std::string eventname;
     while (g_running) {  // 检查全局运行标志 {
         a++;
-		writeb(conngplat, "int1", &a, sizeof(a), &error); // 接收数据;
-        printf("writeb a=%d error=%d\n", a, error);
+		ret = writeb(conngplat, "int1", &a, sizeof(a), &error); // 接收数据;
+        if (!ret) {
+            printf("writeb failed, error=%d\n", error);
+		}
+        //printf("writeb a=%d error=%d\n", a, error);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
@@ -77,8 +88,9 @@ void threadFunction3() {
         char str2[1000] = { 0 };
         ret = readb_string(conngplat, "string1", str2, sizeof(str2), &error); // 接收数据
         if (ret) {
-            printf("readb_string str2=%s error=%d\n", str2, error);
-        } else {
+            //printf("readb_string str2=%s error=%d\n", str2, error);
+        } else
+        {
             printf("writeb_string failed, error=%d\n", error);
 		}
 

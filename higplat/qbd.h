@@ -137,6 +137,7 @@ struct BOARD_INDEX_STRUCT
 	char  itemname[MAXDQNAMELENTH];
 	int    startpos;		// reference to the beginning of date part.
 	int    itemsize;
+	int    strlenth;		// 字符串长度(不包括'\0')
 	bool   erased;			// 表删除标志
 	timespec timestamp;		// write time
 	int	   typeaddr;		// 类型起始地址

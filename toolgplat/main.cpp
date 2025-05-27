@@ -1,12 +1,14 @@
-﻿#include <iostream>
+﻿#include <readline/readline.h>
+#include <readline/history.h>
+#include <iostream>
 #include <string>
 #include <vector>
 #include <algorithm>
 #include <cctype>
 #include <cstdlib> // for strtol
 #include <unistd.h>
-#include "..//include//higplat.h"
 #include <string.h>
+#include "..//include//higplat.h"
 
 
 //-1代表复合类型
@@ -33,6 +35,7 @@ enum QBDType
     database
 };
 QBDType g_qbdtype;
+
 int g_hConn;
 
 struct GlobalObj {
@@ -43,40 +46,44 @@ struct GlobalObj {
     // They would need to be replaced with appropriate C++ alternatives
 };
 
-std::string GlobalObj::prefix = "QBT>";
+std::string GlobalObj::prefix = "gplat>";
 std::string GlobalObj::nodename = "";
 std::string GlobalObj::qbdname = "";
 
 void Analyse(const std::vector<std::string>& words);
 
-int main(int argc, char* argv[])
-{
-    std::cout << GlobalObj::prefix;
-    std::string line;
+int main(int argc, char* argv[]) {
+    // 设置 readline 的自动补全（可选）
+    rl_bind_key('\t', rl_complete); // 启用 Tab 补全
+
+    char* line;
     std::vector<std::string> words;
 
-    while (std::getline(std::cin, line))
-    {
-        if (line.empty()) continue;
+    while ((line = readline(GlobalObj::prefix.c_str()))) { // 使用 readline 替代 std::getline
+        if (!line) break; // 处理 Ctrl+D
 
-        // Split into words
+        // 添加到历史记录（非空行）
+        if (*line) add_history(line);
+
+        // 转换为 std::string 方便处理
+        std::string input(line);
+        free(line); // readline 返回的指针需要手动释放
+
+        if (input.empty()) continue;
+
+        // 分割单词逻辑（保持不变）
         size_t start = 0, end = 0;
-        while ((end = line.find(' ', start)) != std::string::npos)
-        {
-            if (end != start)
-            {
-                words.push_back(line.substr(start, end - start));
+        while ((end = input.find(' ', start)) != std::string::npos) {
+            if (end != start) {
+                words.push_back(input.substr(start, end - start));
             }
             start = end + 1;
         }
-        if (start < line.length())
-        {
-            words.push_back(line.substr(start));
+        if (start < input.length()) {
+            words.push_back(input.substr(start));
         }
 
-        if (!words.empty())
-        {
-            // Case-insensitive comparison
+        if (!words.empty()) {
             std::string firstWord = words[0];
             std::transform(firstWord.begin(), firstWord.end(), firstWord.begin(),
                 [](unsigned char c) { return std::tolower(c); });
@@ -88,7 +95,6 @@ int main(int argc, char* argv[])
         }
 
         words.clear();
-        std::cout << GlobalObj::prefix;
     }
 
     if (g_hConn > 0)
@@ -96,6 +102,54 @@ int main(int argc, char* argv[])
 
     return 0;
 }
+
+//int main(int argc, char* argv[])
+//{
+//    std::cout << GlobalObj::prefix;
+//    std::string line;
+//    std::vector<std::string> words;
+//
+//    while (std::getline(std::cin, line))
+//    {
+//        if (line.empty()) continue;
+//
+//        // Split into words
+//        size_t start = 0, end = 0;
+//        while ((end = line.find(' ', start)) != std::string::npos)
+//        {
+//            if (end != start)
+//            {
+//                words.push_back(line.substr(start, end - start));
+//            }
+//            start = end + 1;
+//        }
+//        if (start < line.length())
+//        {
+//            words.push_back(line.substr(start));
+//        }
+//
+//        if (!words.empty())
+//        {
+//            // Case-insensitive comparison
+//            std::string firstWord = words[0];
+//            std::transform(firstWord.begin(), firstWord.end(), firstWord.begin(),
+//                [](unsigned char c) { return std::tolower(c); });
+//
+//            if (firstWord == "exit" || firstWord == "q")
+//                break;
+//
+//            Analyse(words);
+//        }
+//
+//        words.clear();
+//        std::cout << GlobalObj::prefix;
+//    }
+//
+//    if (g_hConn > 0)
+//        close(g_hConn);
+//
+//    return 0;
+//}
 
 void HandleConnect(const std::string& remotehost)
 {
@@ -123,7 +177,7 @@ void HandleOpenBoard()
     g_qbdtype = board;
     GlobalObj::qbdname = "BOARD";
 
-    GlobalObj::prefix = GlobalObj::nodename + ".BOARD::>";
+    GlobalObj::prefix = GlobalObj::nodename + ".BOARD>";
 }
 
 //para  复合类型名$负荷类型大小 或者 简单类型名

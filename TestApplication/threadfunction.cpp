@@ -18,6 +18,7 @@ void threadFunction1() {
     bool ret{ false };
     unsigned int error;
     subscribe(conngplat, "int1", &error);
+    subscribe(conngplat, "string1", &error);
     subscribe(conngplat, "timer_500ms", &error);
     subscribe(conngplat, "timer_1s", &error);
     subscribe(conngplat, "timer_2s", &error);
@@ -45,8 +46,17 @@ void threadFunction1() {
             }
             //printf("readb b=%f error=%d\n", a, error);
         }
+        else if (eventname == "string1") {
+            std::string str2;
+            ret = readb_string2(conngplat, "string1", str2, &error); // 接收数据
+            if (ret) {
+                printf("readb_string2 str2=%s error=%d\n", str2.c_str(), error);
+            }
+            else {
+                printf("readb_string2 failed, error=%d\n", error);
+            }
+        }
     }
-
     printf("work thread exit\n");
 }
 
@@ -80,19 +90,28 @@ void threadFunction3() {
     int a = 0;
     std::string eventname;
     while (g_running) {
-		std::string suffix = std::to_string(a++);  
-        char str1[100] = "hello world, gyb loop=";
-		strcat(str1, suffix.c_str()); // 将数字转换为字符串并复制到 str1
-        ret = writeb_string(conngplat, "string1", str1, strlen(str1), &error); // 发送数据
+        std::string suffix = std::to_string(a++);
+        char str1[100] = "hello world, gyb 77777777777777777777777777777777777777777777777 loop=";
+        strcat(str1, suffix.c_str()); // 将数字转换为字符串并复制到 str1
+        ret = writeb_string(conngplat, "string1", str1, &error); // 发送数据
 
-        char str2[1000] = { 0 };
-        ret = readb_string(conngplat, "string1", str2, sizeof(str2), &error); // 接收数据
-        if (ret) {
-            //printf("readb_string str2=%s error=%d\n", str2, error);
-        } else
-        {
-            printf("writeb_string failed, error=%d\n", error);
-		}
+        //char str2[1000] = { 0 };
+        //ret = readb_string(conngplat, "string1", str2, sizeof(str2), &error); // 接收数据
+        //if (ret) {
+        //    printf("readb_string str2=%s error=%d\n", str2, error);
+        //}
+        //else {
+        //    printf("writeb_string failed, error=%d\n", error);
+        //}
+
+        std::string str2;
+        ret = readb_string2(conngplat, "string1", str2, &error); // 接收数据
+        //if (ret) {
+        //    printf("readb_string2 str2=%s error=%d\n", str2.c_str(), error);
+        //}
+        //else {
+        //    printf("readb_string2 failed, error=%d\n", error);
+        //}
 
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }

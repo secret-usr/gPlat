@@ -896,6 +896,19 @@ extern "C" bool writeb_string(int sockfd, const char* tagname, const char* value
 	return (*error == 0);
 }
 
+extern "C" bool writeb_string2(int sockfd, const char* tagname, std::string& value, unsigned int* error)
+{
+	// 确保字符串以 null 结尾
+	if (value.length() >= MAXMSGLEN) {
+		*error = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+	// mark
+	// 直接传递 c_str()，因为 writeb_string 已经处理了字符串长度和 null 结尾问题
+	// 但是这样会损失效率，因为没有利用std::string的length()方法，length()方法比strlen()更快，因为它不需要遍历字符串
+	return writeb_string(sockfd, tagname, value.c_str(), error);
+}
+
 extern "C" bool subscribe(int sockfd, const char* tagname, unsigned int* error)
 {
 	// 参数校验

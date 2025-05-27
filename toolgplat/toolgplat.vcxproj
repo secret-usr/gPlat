@@ -86,8 +86,11 @@
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>
-      <LibraryDependencies>higplat</LibraryDependencies>
+      <LibraryDependencies>higplat;readline</LibraryDependencies>
     </Link>
+    <ClCompile>
+      <AdditionalIncludeDirectories>/usr/local/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

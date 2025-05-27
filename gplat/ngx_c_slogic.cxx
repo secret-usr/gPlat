@@ -34,6 +34,8 @@
 #include "../include/higplat.h"
 #include <iostream>
 
+thread_local char g_buffer[MAXMSGLEN] = { 0 };
+
 //定义成员函数指针
 typedef bool (CLogicSocket::* handler)(lpngx_connection_t pConn,      //连接池中连接的指针
 	LPSTRUC_MSG_HEADER pMsgHeader,  //消息头指针
@@ -586,19 +588,38 @@ bool CLogicSocket::HandleReadBString(lpngx_connection_t pConn, LPSTRUC_MSG_HEADE
 
 	PPKGHEAD pPkgHead = (PPKGHEAD)pPkgHeader; //包头
 	bool ret;
-	int iLenPkgBody = pPkgHead->datasize;
-	//直接分配内存返回数据
-	CMemory* p_memory = CMemory::GetInstance();
-	char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + iLenPkgBody, false);//准备发送的格式，这里是消息头+包头+包体
 
-	if (ret = ReadB_String(pPkgHead->qname, pPkgHead->itemname, p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader, iLenPkgBody, &timestamp))
+	//直接分配内存返回数据
+	//int iLenPkgBody = pPkgHead->datasize;
+	//CMemory* p_memory = CMemory::GetInstance();
+	//char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + iLenPkgBody, false);//准备发送的格式，这里是消息头+包头+包体
+	//if (ret = ReadB_String(pPkgHead->qname, pPkgHead->itemname, p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader, iLenPkgBody, &timestamp))
+	//{
+	//	pPkgHead->error = 0;
+	//	pPkgHead->bodysize = pPkgHead->datasize;
+	//	pPkgHead->timestamp = timestamp;
+	//}
+	//else
+	//{
+	//	pPkgHead->error = GetLastErrorQ();
+	//	pPkgHead->bodysize = 0;
+	//}
+
+	CMemory* p_memory = CMemory::GetInstance();
+	char* p_sendbuf;
+	int strlen = 0;
+	if (ret = ReadB_String2(pPkgHead->qname, pPkgHead->itemname, g_buffer, pPkgHead->datasize, strlen, &timestamp))
 	{
+		p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + strlen, false);//准备发送的格式，这里是消息头+包头+包体
+
 		pPkgHead->error = 0;
-		pPkgHead->bodysize = pPkgHead->datasize;
+		pPkgHead->bodysize = strlen;	//包体长度是实际读取的长度，不是datasize
 		pPkgHead->timestamp = timestamp;
 	}
 	else
 	{
+		p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader, false);//准备发送的格式，这里是消息头+包头+包体
+
 		pPkgHead->error = GetLastErrorQ();
 		pPkgHead->bodysize = 0;
 	}
@@ -611,7 +632,14 @@ bool CLogicSocket::HandleReadBString(lpngx_connection_t pConn, LPSTRUC_MSG_HEADE
 	//c)填充包头
 	memcpy(p_sendbuf + m_iLenMsgHeader, pPkgHeader, m_iLenPkgHeader);         //包头直接拷贝到这里来
 	//c)填充包体
-	//这里不用了，上面ReadQ已经填充了包体
+	if (ret && strlen > 0) //如果读取成功，才填充包体
+	{
+		memcpy(p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader, g_buffer, strlen); //跳过消息头，跳过包头，就是包体了
+	}
+	else //如果读取失败，包体就不填充了
+	{
+		//包体不填充，直接发送空包体
+	}
 
 	//f)发送数据包
 	msgSend(p_sendbuf);

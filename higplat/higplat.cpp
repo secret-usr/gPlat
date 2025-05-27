@@ -35,7 +35,8 @@ enum EVENTID
 	EQUAL_ZERO = 8,
 };
 
-thread_local  unsigned int errorCode = 0;
+thread_local char g_buffer[MAXMSGLEN] = { 0 };
+thread_local unsigned int errorCode = 0;
 char dataQuePath[100] = ".//qbdfile//";
 struct TABLE_MSG table[TABLESIZE];
 int tabCounter = 0;
@@ -764,10 +765,10 @@ extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize
 	return (*error == 0);
 }
 
-extern "C" bool readb_string(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error, timespec* timestamp)
+extern "C" bool readb_string(int sockfd, const char* tagname, char* value, int buffersize, unsigned int* error, timespec* timestamp)
 {
 	// 参数校验
-	if (!tagname || !value || !error || actsize <= 0) {
+	if (!tagname || !value || !error || buffersize <= 0) {
 		*error = ERROR_INVALID_PARAMETER;
 		return false;
 	}
@@ -775,7 +776,7 @@ extern "C" bool readb_string(int sockfd, const char* tagname, void* value, int a
 	// 初始化消息头
 	MSGSTRUCT msg{};
 	msg.head.id = READBSTRING;
-	msg.head.datasize = actsize;
+	msg.head.datasize = buffersize;
 	msg.head.bodysize = 0;
 
 	// 安全拷贝字符串
@@ -806,7 +807,8 @@ extern "C" bool readb_string(int sockfd, const char* tagname, void* value, int a
 	}
 
 	// 验证数据大小
-	if (msg.head.bodysize > actsize) {
+	// 目前这种情况不可能出现，因为服务器会确保数据体大小不超过buffersize，如果buffsize不够大，上面错误码不为零就会返回
+	if (msg.head.bodysize > buffersize) {
 		*error = ERROR_BUFFER_TOO_SMALL;
 		close(sockfd);
 		return false;
@@ -829,15 +831,27 @@ extern "C" bool readb_string(int sockfd, const char* tagname, void* value, int a
 	return true;
 }
 
-extern "C" bool writeb_string(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error)
+extern "C" bool readb_string2(int sockfd, const char* tagname, std::string& value, unsigned int* error, timespec* timestamp = 0)
 {
+	if (readb_string(sockfd, tagname, g_buffer, MAXMSGLEN, error, timestamp)) {
+		// 确保字符串以 null 结尾
+		g_buffer[MAXMSGLEN - 1] = '\0';
+		value.assign(g_buffer);  // 使用 std::string 的 assign 方法
+		return true;
+	}
+}
+
+extern "C" bool writeb_string(int sockfd, const char* tagname, const char* value, unsigned int* error)
+{
+	int strlength = strlen((const char*)value);
+
 	// 参数校验
-	if (!tagname || !value || !error || actsize <= 0) {
+	if (!tagname || !value || !error) {
 		*error = ERROR_INVALID_PARAMETER;
 		return false;
 	}
 
-	if (actsize > MAXMSGLEN) {
+	if (strlength > MAXMSGLEN) {
 		*error = ERROR_PARAMETER_SIZE;
 		return false;
 	}
@@ -845,8 +859,8 @@ extern "C" bool writeb_string(int sockfd, const char* tagname, void* value, int 
 	// 初始化消息头
 	MSGSTRUCT msg{};
 	msg.head.id = WRITEBSTRING;
-	msg.head.datasize = actsize;
-	msg.head.bodysize = actsize;
+	msg.head.datasize = strlength;
+	msg.head.bodysize = strlength;
 	msg.head.offset = 0;
 	msg.head.subsize = 0;
 
@@ -858,7 +872,7 @@ extern "C" bool writeb_string(int sockfd, const char* tagname, void* value, int 
 	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
 
 	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0 ||
-		send_all(sockfd, value, actsize) <= 0) {
+		send_all(sockfd, value, strlength) <= 0) {
 		*error = errno;
 		close(sockfd);
 		return false;
@@ -2257,6 +2271,37 @@ extern "C" bool ReadB(const char* lpBulletinName, const char* lpItemName, void* 
 	return true;
 }
 
+extern "C" int GetStringLength(const char* lpBulletinName, const char* lpItemName)
+{
+	// Search bulletin in hash table.
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpBulletinName, tabmsg))
+	{
+		return -1;
+	}
+
+	BOARD_HEAD* pHead = static_cast<BOARD_HEAD*>(tabmsg.lpMapAddress);
+	BOARD_INDEX_STRUCT* pIndex = pHead->index;
+
+	// search item in bulletin's index(hash table)
+	int loc, c;
+	loc = hash1(lpItemName);
+	c = hash2(lpItemName);
+	tabmsg.pmutex_rw->lock();
+	while (pIndex[loc].itemname[0] != '\0' && strcmp(pIndex[loc].itemname, lpItemName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+	if (!strcmp(pIndex[loc].itemname, "\0") || pIndex[loc].erased)
+	{
+		// item not found
+		tabmsg.pmutex_rw->unlock();
+		return -1;
+	}
+	tabmsg.pmutex_rw->unlock();
+	return pIndex[loc].strlenth; // 返回实际字符串长度，不包括'\0'结尾
+}
+
 extern "C" bool ReadB_String(const char* lpBulletinName, const char* lpItemName, void* lpItem, int actSize, timespec* timestamp)
 {
 	// Search bulletin in hash table.
@@ -2296,7 +2341,9 @@ extern "C" bool ReadB_String(const char* lpBulletinName, const char* lpItemName,
 	}
 
 	// validate item size
-	if (pIndex[loc].itemsize > actSize)
+	//if (pIndex[loc].itemsize > actSize)
+	//改为验证实际字符串长度是否超过缓冲区大小
+	if (pIndex[loc].strlenth > actSize)
 	{
 		errorCode = BUFFER_TOO_SMALL;
 		tabmsg.pmutex_rw->unlock();
@@ -2308,13 +2355,85 @@ extern "C" bool ReadB_String(const char* lpBulletinName, const char* lpItemName,
 	std::lock_guard<std::mutex> lock(pHead->mutex_rw_tag[loc & (MUTEXSIZE - 1)]);
 
 	//ZeroMemory(lpItem, actSize);
+	//mark 确保返回的字符串是以'\0'结尾的，但当缓冲区长度刚好等于实际字符串长度的时候，不能保证'\0'结尾
 	memset(lpItem, 0, actSize);
-	memcpy(lpItem, (char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, pIndex[loc].itemsize);
+	//memcpy(lpItem, (char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, pIndex[loc].itemsize);
+	//mark 改为拷贝实际长度
+	memcpy(lpItem, (char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, pIndex[loc].strlenth);
 	if (timestamp != 0)
 	{
 		*timestamp = pIndex[loc].timestamp;
 	}
 
+	return true;
+}
+
+//返回字符串的实际长度，不包括'\0'结尾	
+extern "C" bool ReadB_String2(const char* lpBulletinName, const char* lpItemName, void* lpItem, int actSize, int& strLength, timespec* timestamp)
+{
+	// Search bulletin in hash table.
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpBulletinName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	BOARD_HEAD* pHead;
+	BOARD_INDEX_STRUCT* pIndex;
+	pHead = (BOARD_HEAD*)lpMapAddress;
+	pIndex = pHead->index;
+
+	// search item in bulletin's index(hash table)
+	int loc, c;
+	loc = hash1(lpItemName);
+	c = hash2(lpItemName);
+
+	//std::lock_guard<std::mutex> lock(*tabmsg.pmutex_rw);
+	tabmsg.pmutex_rw->lock();
+
+	while (strcmp(pIndex[loc].itemname, "\0") && strcmp(pIndex[loc].itemname, lpItemName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (!strcmp(pIndex[loc].itemname, "\0") || pIndex[loc].erased)
+	{
+		// item not found
+		errorCode = ERROR_RECORD_NOT_EXIST;
+		tabmsg.pmutex_rw->unlock();
+		return false;
+	}
+
+	// validate item size
+	//if (pIndex[loc].itemsize > actSize)
+	//改为验证实际字符串长度是否超过缓冲区大小
+	if (pIndex[loc].strlenth > actSize)
+	{
+		errorCode = BUFFER_TOO_SMALL;
+		tabmsg.pmutex_rw->unlock();
+		return false;
+	}
+
+	tabmsg.pmutex_rw->unlock();
+
+	std::lock_guard<std::mutex> lock(pHead->mutex_rw_tag[loc & (MUTEXSIZE - 1)]);
+
+	//ZeroMemory(lpItem, actSize);
+	//mark 确保返回的字符串是以'\0'结尾的，但当缓冲区长度刚好等于实际字符串长度的时候，不能保证'\0'结尾
+	//注释是因为返回了实际长度，不需要'\0'结尾，由调用方决定是否添加'\0'结尾
+	//memset(lpItem, 0, actSize);
+	//memcpy(lpItem, (char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, pIndex[loc].itemsize);
+	//mark 改为拷贝实际长度
+	memcpy(lpItem, (char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, pIndex[loc].strlenth);
+	if (timestamp != 0)
+	{
+		*timestamp = pIndex[loc].timestamp;
+	}
+
+	strLength = pIndex[loc].strlenth; // 返回实际字符串长度，不包括'\0'结尾	
 	return true;
 }
 
@@ -2504,7 +2623,10 @@ extern "C" bool WriteB_String(const char* lpBulletinName, const char* lpItemName
 			errorCode = STRING_TOO_LONG;
 			return false;
 		}
+
+		pIndex[loc].strlenth = actSize;	//mark 记录字符串长度，便于读取时判断是否足够
 		//ZeroMemory((char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, pIndex[loc].itemsize);
+		//mark 下面的置零操作现在有些多余，因为字段strlenth已经记录了当前字符串的长度，但为了安全，还是保留了
 		memset((char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, 0, pIndex[loc].itemsize);
 		memcpy((char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, lpItem, actSize);
 		//_time64(&pIndex[loc].timestamp);

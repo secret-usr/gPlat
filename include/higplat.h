@@ -156,8 +156,8 @@ extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize
 extern "C" bool subscribe(int sockfd, const char* tagname, unsigned int* error);
 extern "C" bool createtag(int sockfd, const char* tagname, int tagsize, void* type, int typesize, unsigned int* error);
 extern "C" bool waitpostdata(int sockfd, std::string& tagname, int timeout, unsigned int* error);
-extern "C" bool readb_string(int sockfd, const char* tagname, void* value, int actSize, unsigned int* error, timespec*timestamp=0);
-extern "C" bool writeb_string(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error);
+extern "C" bool readb_string(int sockfd, const char* tagname, char* value, int buffersize, unsigned int* error, timespec*timestamp=0);
+extern "C" bool writeb_string(int sockfd, const char* tagname, const char* value, unsigned int* error);
 extern "C" bool readb_string2(int sockfd, const char* tagname, std::string& value, unsigned int* error, timespec* timestamp = 0);
 extern "C" bool writeb_string2(int sockfd, const char* tagname, std::string& value, unsigned int* error);
 
@@ -204,6 +204,7 @@ extern "C" bool WriteQ(const char* lpDqName, void  *lpRecord, int actSize=0, con
 //DllImport BOOL __cdecl ReadInfoB( LPCTSTR lpBulletinName, int* pTotalSize, int* pDataSize, int* pLeftSize, int* pItemNumint, int* buffSize, TCHAR ppBuff[][24]);
 extern "C" bool ReadB(const char* lpBoardName, const char* lpItemName, void* lpItem, int actSize, timespec* timestamp = 0);
 extern "C" bool ReadB_String(const char* lpBulletinName, const char* lpItemName, void*lpItem, int actSize, timespec*timestamp=0);
+extern "C" bool ReadB_String2(const char* lpBulletinName, const char* lpItemName, void* lpItem, int actSize, int& strLength, timespec* timestamp);
 //DllImport BOOL __cdecl ReadB_String(HANDLE hServer, LPCTSTR lpBulletinName, LPCTSTR lpItemName, VOID  *lpItem, int actSize, DWORD * error, time_t *timestamp=0);
 //DllImport BOOL __cdecl ReadB( VOID * pBulletin, LPCTSTR lpItemName, VOID  *lpItem, int actSize, time_t *timestamp=0 );
 extern "C" bool WriteB(const char* lpBulletinName, const char* lpItemName, void* lpItem, int actSize, void* lpSubItem = 0, int actSubSize = 0);

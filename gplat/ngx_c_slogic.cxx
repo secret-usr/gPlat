@@ -91,7 +91,7 @@ static const handler statusHandler[] =
 	//CLOSEQ,       //CLOSEB
 	&CLogicSocket::noop,
 	//CLEARQ,
-	&CLogicSocket::noop,
+	&CLogicSocket::HandleClearQ,
 	//ISEMPTYQ,
 	&CLogicSocket::noop,
 	//ISFULLQ,
@@ -363,7 +363,7 @@ bool CLogicSocket::noop(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader,
 
 bool CLogicSocket::HandleReadQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
 {
-	ngx_log_stderr(0, "执行了CLogicSocket::HandleReadQ()!");
+	//ngx_log_stderr(0, "执行了CLogicSocket::HandleReadQ()!");
 
 	//(1)首先判断包体的合法性
 	if (pPkgHeader == NULL) //具体看客户端服务器约定，如果约定这个命令[msgCode]必须带包体，那么如果不带包体，就认为是恶意包，直接不处理    
@@ -390,9 +390,6 @@ bool CLogicSocket::HandleReadQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsg
 		pPkgHead->bodysize = 0;
 	}
 
-	//mark 即使读取失败，也要返回一个包给客户端，而且包体的长度和用户申请的长度一致，这样用户读的时候就不会出错
-	//pPkgHead->bodysize = pPkgHead->datasize;
-
 	//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程
 	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
 
@@ -411,7 +408,7 @@ bool CLogicSocket::HandleReadQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsg
 
 bool CLogicSocket::HandleWriteQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
 {
-	ngx_log_stderr(0, "执行了CLogicSocket::HandleWriteQ()!");
+	//ngx_log_stderr(0, "执行了CLogicSocket::HandleWriteQ()!");
 
 	//(1)首先判断包体的合法性
 	if (pPkgHeader == NULL) //具体看客户端服务器约定，如果约定这个命令[msgCode]必须带包体，那么如果不带包体，就认为是恶意包，直接不处理    
@@ -434,12 +431,10 @@ bool CLogicSocket::HandleWriteQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 
 	pPkgHead->bodysize = 0;
 
-	//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程
 	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
 
-	int iLenPkgBody = 0;
 	CMemory* p_memory = CMemory::GetInstance();
-	char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + iLenPkgBody, false);//准备发送的格式，这里是消息头+包头+包体
+	char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader, false);//准备发送的格式，这里是消息头+包头+包体
 	//b)填充消息头
 	memcpy(p_sendbuf, pMsgHeader, m_iLenMsgHeader);           //消息头直接拷贝到这里来
 	//c)填充包头
@@ -462,9 +457,43 @@ bool CLogicSocket::HandleWriteQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	return true;
 }
 
+bool CLogicSocket::HandleClearQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
+{
+	//(1)首先判断包体的合法性
+	if (pPkgHeader == NULL) //具体看客户端服务器约定，如果约定这个命令[msgCode]必须带包体，那么如果不带包体，就认为是恶意包，直接不处理    
+	{
+		return false;
+	}
+
+	PPKGHEAD pPkgHead = (PPKGHEAD)pPkgHeader; //包头
+	bool ret;
+
+	if (ret = ClearQ(pPkgHead->qname))
+	{
+		pPkgHead->error = 0;
+	}
+	else
+	{
+		pPkgHead->error = GetLastErrorQ();
+	}
+
+	pPkgHead->bodysize = 0;
+
+	CMemory* p_memory = CMemory::GetInstance();
+	char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader, false);//准备发送的格式，这里是消息头+包头+包体
+	//b)填充消息头
+	memcpy(p_sendbuf, pMsgHeader, m_iLenMsgHeader);           //消息头直接拷贝到这里来
+	//c)填充包头
+	memcpy(p_sendbuf + m_iLenMsgHeader, pPkgHeader, m_iLenPkgHeader);         //包头直接拷贝到这里来
+
+	//f)发送数据包
+	msgSend(p_sendbuf);
+
+	return true;
+}
+
 bool CLogicSocket::HandleReadB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
 {
-	//debug
 	//ngx_log_stderr(0, "执行了CLogicSocket::HandleReadB()!");
 
 	//(1)首先判断包体的合法性
@@ -518,7 +547,6 @@ bool CLogicSocket::HandleReadB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsg
 
 bool CLogicSocket::HandleWriteB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
 {
-	//debug
 	//ngx_log_stderr(0, "执行了CLogicSocket::HandleWriteB()!");
 
 	//(1)首先判断包体的合法性
@@ -575,7 +603,6 @@ bool CLogicSocket::HandleWriteB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 
 bool CLogicSocket::HandleReadBString(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
 {
-	//debug
 	//ngx_log_stderr(0, "执行了CLogicSocket::HandleReadB()!");
 
 	//(1)首先判断包体的合法性
@@ -649,7 +676,6 @@ bool CLogicSocket::HandleReadBString(lpngx_connection_t pConn, LPSTRUC_MSG_HEADE
 
 bool CLogicSocket::HandleWriteBString(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
 {
-	//debug
 	//ngx_log_stderr(0, "执行了CLogicSocket::HandleWriteB()!");
 
 	//(1)首先判断包体的合法性
@@ -745,7 +771,7 @@ bool CLogicSocket::HandleSubscribe(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER 
 
 bool CLogicSocket::HandlePostWait(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
 {
-	ngx_log_stderr(0, "执行了CLogicSocket::HandlePostWait()!");
+	//ngx_log_stderr(0, "执行了CLogicSocket::HandlePostWait()!");
 
 	//(1)首先判断包体的合法性
 	if (pPkgHeader == NULL) //具体看客户端服务器约定，如果约定这个命令[msgCode]必须带包体，那么如果不带包体，就认为是恶意包，直接不处理    
@@ -961,7 +987,7 @@ void CLogicSocket::NotifyTimerSubscriber(std::string timerName)
 
 bool CLogicSocket::HandleCreateItem(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
 {
-	ngx_log_stderr(0, "执行了CLogicSocket::HandleCreateItem()!");
+	//ngx_log_stderr(0, "执行了CLogicSocket::HandleCreateItem()!");
 
 	//(1)首先判断包体的合法性
 	if (pPkgHeader == NULL) //具体看客户端服务器约定，如果约定这个命令[msgCode]必须带包体，那么如果不带包体，就认为是恶意包，直接不处理    

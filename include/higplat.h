@@ -151,6 +151,7 @@ struct DB_HEAD
 extern "C" int connectgplat(const char* server, int port);
 extern "C" bool readq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error);
 extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error);
+extern "C" bool clearq(int sockfd, const char* qname, unsigned int* error);
 extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error, timespec* timestamp = 0);
 extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error);
 extern "C" bool subscribe(int sockfd, const char* tagname, unsigned int* error);
@@ -185,7 +186,7 @@ extern "C" bool WriteQ(const char* lpDqName, void  *lpRecord, int actSize=0, con
 //DllImport BOOL __cdecl Acknowledge( LPCTSTR  lpDqName, int index );
 //DllImport BOOL __cdecl Acknowledge( HANDLE hServer, LPCTSTR  lpDqName, int index, DWORD * error );
 //DllImport BOOL __cdecl SetPtrQ( LPCTSTR  lpDqName, int readPtr, int writePtr );
-//DllImport BOOL __cdecl ClearQ( LPCTSTR  lpDqName );
+extern "C" bool ClearQ(const char* lpDqName );
 //DllImport BOOL __cdecl PeekQ( LPCTSTR  lpDqName, VOID  *lpRecord, int actSize );
 //DllImport BOOL __cdecl IsEmptyQ( LPCTSTR  lpDqName );
 //DllImport BOOL __cdecl IsFullQ( LPCTSTR  lpDqName );

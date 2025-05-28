@@ -643,6 +643,46 @@ extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize,
 	return (*error == 0);
 }
 
+bool clearq(int sockfd, const char* qname, unsigned int* error)
+{
+	// 参数校验
+	if (!qname || !error) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = CLEARQ;
+	msg.head.bodysize = 0;
+
+	// 安全拷贝队列名
+	strncpy(msg.head.qname, qname, sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	// 发送请求
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取响应头
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 检查错误码
+	*error = msg.head.error;
+	if (*error != 0) {
+		return false;
+	}
+
+	return true;
+}
+
 extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error, timespec* timestamp)
 {
 	// 参数校验

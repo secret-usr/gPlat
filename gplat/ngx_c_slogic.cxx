@@ -846,7 +846,7 @@ void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader)
 
 	if (usernumber > 0)
 	{
-		ngx_log_stderr(0, "%s:usernumber=%d\n", tagName.c_str(), usernumber);
+		//ngx_log_stderr(0, "%s:usernumber=%d\n", tagName.c_str(), usernumber);
 		for (auto subscriber : subscribers)
 		{
 			CMemory* p_memory = CMemory::GetInstance();

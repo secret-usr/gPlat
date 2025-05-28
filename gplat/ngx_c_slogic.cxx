@@ -607,13 +607,13 @@ bool CLogicSocket::HandleReadBString(lpngx_connection_t pConn, LPSTRUC_MSG_HEADE
 
 	CMemory* p_memory = CMemory::GetInstance();
 	char* p_sendbuf;
-	int strlen = 0;
+	int strlen = 0;	//接收字符串的实际长度
 	if (ret = ReadB_String2(pPkgHead->qname, pPkgHead->itemname, g_buffer, pPkgHead->datasize, strlen, &timestamp))
 	{
 		p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + strlen, false);//准备发送的格式，这里是消息头+包头+包体
 
 		pPkgHead->error = 0;
-		pPkgHead->bodysize = strlen;	//包体长度是实际读取的长度，不是datasize
+		pPkgHead->bodysize = strlen;	//包体长度是实际读取的长度，不是datasize（用户缓冲区的长度）
 		pPkgHead->timestamp = timestamp;
 	}
 	else

@@ -807,7 +807,7 @@ extern "C" bool readb_string(int sockfd, const char* tagname, char* value, int b
 	}
 
 	// 验证数据大小
-	// 目前这种情况不可能出现，因为服务器会确保数据体大小不超过buffersize，如果buffsize不够大，上面错误码不为零就会返回
+	// 目前这种情况不可能出现，因为服务器会确保数据体大小不超过buffersize，如果buffsize不够大，上面错误码不为零就会返回，不会走到这里
 	if (msg.head.bodysize > buffersize) {
 		*error = ERROR_BUFFER_TOO_SMALL;
 		close(sockfd);
@@ -823,6 +823,13 @@ extern "C" bool readb_string(int sockfd, const char* tagname, char* value, int b
 		}
 	}
 
+	// 确保字符串以 null 结尾
+	if (msg.head.bodysize < buffersize) {
+		value[msg.head.bodysize] = '\0';  // 确保 null 结尾
+	} else {
+		value[buffersize - 1] = '\0';  // 防止溢出
+	}
+
 	// 返回时间戳（如果请求）
 	if (timestamp) {
 		*timestamp = msg.head.timestamp;
@@ -833,12 +840,84 @@ extern "C" bool readb_string(int sockfd, const char* tagname, char* value, int b
 
 extern "C" bool readb_string2(int sockfd, const char* tagname, std::string& value, unsigned int* error, timespec* timestamp = 0)
 {
-	if (readb_string(sockfd, tagname, g_buffer, MAXMSGLEN, error, timestamp)) {
-		// 确保字符串以 null 结尾
-		g_buffer[MAXMSGLEN - 1] = '\0';
-		value.assign(g_buffer);  // 使用 std::string 的 assign 方法
-		return true;
+	//if (readb_string(sockfd, tagname, g_buffer, MAXMSGLEN, error, timestamp)) {
+	//	// 确保字符串以 null 结尾
+	//	g_buffer[MAXMSGLEN - 1] = '\0';
+	//	value.assign(g_buffer);  // 使用 std::string 的 assign 方法
+	//	return true;
+	//}
+
+	// 参数校验
+	if (!tagname || !error) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
 	}
+
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = READBSTRING;
+	msg.head.datasize = MAXMSGLEN;
+	msg.head.bodysize = 0;
+
+	// 安全拷贝字符串
+	strncpy(msg.head.qname, "BOARD", sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+
+	// 发送请求
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取响应头
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 检查错误码
+	*error = msg.head.error;
+	if (*error != 0) {
+		return false;
+	}
+
+	// 验证数据大小
+	// 目前这种情况不可能出现，因为服务器会确保数据体大小不超过buffersize，如果buffsize不够大，上面错误码不为零就会返回，不会走到这里
+	if (msg.head.bodysize > MAXMSGLEN) {
+		*error = ERROR_BUFFER_TOO_SMALL;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取数据体（如果有）
+	if (msg.head.bodysize > 0) {
+		if (readn(sockfd, g_buffer, msg.head.bodysize) < 0) {
+			*error = errno;
+			close(sockfd);
+			return false;
+		}
+	}
+
+	// 确保字符串以 null 结尾
+	if (msg.head.bodysize < MAXMSGLEN) {
+		g_buffer[msg.head.bodysize] = '\0';  // 确保 null 结尾
+	}
+	else {
+		g_buffer[MAXMSGLEN - 1] = '\0';  // 防止溢出
+	}
+
+	// 返回时间戳（如果请求）
+	if (timestamp) {
+		*timestamp = msg.head.timestamp;
+	}
+
+	value.assign(g_buffer, msg.head.bodysize);  // 使用 std::string 的 assign 方法
+	return true;
 }
 
 extern "C" bool writeb_string(int sockfd, const char* tagname, const char* value, unsigned int* error)

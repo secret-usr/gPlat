@@ -91,7 +91,7 @@ void threadFunction3() {
     std::string eventname;
     while (g_running) {
         std::string suffix = std::to_string(a++);
-        char str1[100] = "hello world, gyb 777777777777777777777777777777777777777777777777777777777 loop=";
+        char str1[200] = "hello world, gyb 77777777777777777777777777777777777777777777777777777777777777777777777777777 loop=";
         strcat(str1, suffix.c_str()); // 将数字转换为字符串并复制到 str1
         ret = writeb_string(conngplat, "string1", str1, &error); // 发送数据
 

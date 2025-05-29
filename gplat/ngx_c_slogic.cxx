@@ -451,7 +451,7 @@ bool CLogicSocket::HandleWriteQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	if (ret)
 	{
 		strcpy(pPkgHead->itemname, pPkgHead->qname);	//必须的，因为最终发布事件的时候是用的itemname
-		NotifySubscriber(pPkgHead->itemname, pPkgHeader);
+		NotifySubscriber(pPkgHead->itemname);
 	}
 
 	return true;
@@ -595,7 +595,7 @@ bool CLogicSocket::HandleWriteB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	//发布订阅
 	if (ret)
 	{
-		NotifySubscriber(pPkgHead->itemname, pPkgHeader);
+		NotifySubscriber(pPkgHead->itemname);
 	}
 
 	return true;
@@ -718,7 +718,7 @@ bool CLogicSocket::HandleWriteBString(lpngx_connection_t pConn, LPSTRUC_MSG_HEAD
 	//发布订阅
 	if (ret)
 	{
-		NotifySubscriber(pPkgHead->itemname, pPkgHeader);
+		NotifySubscriber(pPkgHead->itemname);
 	}
 
 	return true;
@@ -831,7 +831,7 @@ bool CLogicSocket::HandlePostWait(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER p
 	return true;
 }
 
-void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader)
+void CLogicSocket::NotifySubscriber(std::string tagName)
 {
 	std::list<EventNode> subscribers = m_subscriber.GetSubscriber(tagName);
 
@@ -891,7 +891,7 @@ void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader)
 			case EVENTID::POST_DELAY:
 				//NotifySubscriberOnDelayTime(subscriber.eventname, subscriber.eventarg, (ClientContext*)subscriber.subscriber, pOverlapBuff);
 				strcpy(pPkgHead->itemname, subscriber.eventname);	//必须的，因为最终发布事件的时候是用的itemname
-				ngx_log_stderr(0, "CLogicSocket::NotifySubscriber() 事件名=%s, eventarg=%d", pPkgHead->itemname, subscriber.eventarg);
+				//ngx_log_stderr(0, "CLogicSocket::NotifySubscriber() 事件名=%s, eventarg=%d", pPkgHead->itemname, subscriber.eventarg);
 				g_tm.add_once(subscriber.eventarg, [](void* arg) {
 					char* p_sendbuf = (char*)arg;
 					LPSTRUC_MSG_HEADER ptmpMsgHeader = (LPSTRUC_MSG_HEADER)p_sendbuf;
@@ -907,7 +907,7 @@ void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader)
 					{
 						pconn->m_bWaitingPost = false;
 						g_socket.msgSend(p_sendbuf);
-						ngx_log_stderr(0, "CLogicSocket::NotifySubscriber() 发送延时事件成功，eventname=%s, eventarg=%d", pPkgHead->itemname, pconn->m_bWaitingPost);
+						//ngx_log_stderr(0, "CLogicSocket::NotifySubscriber() 发送延时事件成功，eventname=%s, eventarg=%d", pPkgHead->itemname, pconn->m_bWaitingPost);
 					}
 					else
 					{

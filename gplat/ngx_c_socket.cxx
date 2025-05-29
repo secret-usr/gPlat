@@ -803,7 +803,8 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 					continue;
 				}
 
-				std::cout << "CSocekt::ServerSendQueueThread()中发送消息，消息为：" << pPkgHeader->id << " : " << pPkgHeader->itemname << std::endl; //调试用
+				//debug
+				//std::cout << "CSocekt::ServerSendQueueThread()中发送消息，消息为：" << pPkgHeader->id << " : " << pPkgHeader->itemname << std::endl; //调试用
 
 				//走到这里，可以发送消息，一些必须的信息记录，要发送的东西也要从发送队列里干掉
 				p_Conn->psendMemPointer = pMsgBuf;      //发送后释放用的，因为这段内存是new出来的

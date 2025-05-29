@@ -451,7 +451,7 @@ bool CLogicSocket::HandleWriteQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	if (ret)
 	{
 		strcpy(pPkgHead->itemname, pPkgHead->qname);	//必须的，因为最终发布事件的时候是用的itemname
-		NotifySubscriber(pPkgHead->itemname, pPkgHeader);
+		NotifySubscriber(pPkgHead->itemname);
 	}
 
 	return true;
@@ -595,7 +595,7 @@ bool CLogicSocket::HandleWriteB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	//发布订阅
 	if (ret)
 	{
-		NotifySubscriber(pPkgHead->itemname, pPkgHeader);
+		NotifySubscriber(pPkgHead->itemname);
 	}
 
 	return true;
@@ -718,7 +718,7 @@ bool CLogicSocket::HandleWriteBString(lpngx_connection_t pConn, LPSTRUC_MSG_HEAD
 	//发布订阅
 	if (ret)
 	{
-		NotifySubscriber(pPkgHead->itemname, pPkgHeader);
+		NotifySubscriber(pPkgHead->itemname);
 	}
 
 	return true;
@@ -831,7 +831,7 @@ bool CLogicSocket::HandlePostWait(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER p
 	return true;
 }
 
-void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader)
+void CLogicSocket::NotifySubscriber(std::string tagName)
 {
 	std::list<EventNode> subscribers = m_subscriber.GetSubscriber(tagName);
 
@@ -862,6 +862,7 @@ void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader)
 			PPKGHEAD pPkgHead = (PPKGHEAD)(p_sendbuf + m_iLenMsgHeader); //包头
 			pPkgHead->id = POST;	//发布事件
 			strcpy(pPkgHead->itemname, tagName.c_str());	//必须的，因为最终发布事件的时候是用的itemname
+			pPkgHead->error = 0;	//没有错误，如果不拷贝包头，这里的赋值是必须的，因为内存是分配的，包头的内容是未知的！！！
 			pPkgHead->bodysize = 0;	//防御性编程，只发布事件，不发布数据
 
 			//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程

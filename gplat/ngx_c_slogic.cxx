@@ -871,7 +871,7 @@ void CLogicSocket::NotifySubscriber(std::string tagName)
 			switch (subscriber.eventid)
 			{
 			case EVENTID::DEFAULT:
-				ngx_log_stderr(0, "-------------------CLogicSocket::NotifySubscriber() 事件名=%s, eventarg=%d", pPkgHead->itemname, subscriber.eventarg);
+				//ngx_log_stderr(0, "-------------------CLogicSocket::NotifySubscriber() 事件名=%s, eventarg=%d", pPkgHead->itemname, subscriber.eventarg);
 				if (pConn->m_bWaitingTimeout)
 				{
 					pConn->m_bWaitingTimeout = false;

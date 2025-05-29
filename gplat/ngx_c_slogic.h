@@ -35,6 +35,7 @@ public:
 
 	void NotifySubscriber(std::string tagName, char* pPkgHeader);
 	void NotifyTimerSubscriber(std::string timerName);
+	void CancelSubscribe(lpngx_connection_t pConn, const std::list<std::string>& tagList);
 
 public:
 	virtual void threadRecvProcFunc(char *pMsgBuf);

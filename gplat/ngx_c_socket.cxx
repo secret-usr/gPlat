@@ -740,7 +740,7 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 
 	char* pMsgBuf;
 	LPSTRUC_MSG_HEADER	pMsgHeader;
-	//gyn
+	//gyb
 	//LPCOMM_PKG_HEADER   pPkgHeader;
 	PMSGHEAD   pPkgHeader;
 	lpngx_connection_t  p_Conn;
@@ -803,6 +803,8 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 					continue;
 				}
 
+				std::cout << "CSocekt::ServerSendQueueThread()中发送消息，消息为：" << pPkgHeader->id << " : " << pPkgHeader->itemname << std::endl; //调试用
+
 				//走到这里，可以发送消息，一些必须的信息记录，要发送的东西也要从发送队列里干掉
 				p_Conn->psendMemPointer = pMsgBuf;      //发送后释放用的，因为这段内存是new出来的
 				pos2 = pos;
@@ -826,7 +828,7 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 				//ngx_log_stderr(errno, "即将发送数据%ud。", p_Conn->isendlen);	//mark 为啥传入errno而不是0
 
 				//debug
-				auto start = std::chrono::high_resolution_clock::now();
+				//auto start = std::chrono::high_resolution_clock::now();
 
 				sendsize = pSocketObj->sendproc(p_Conn, p_Conn->psendbuf, p_Conn->isendlen); //注意参数
 				if (sendsize > 0)
@@ -863,9 +865,9 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 
 					} //end if(sendsize > 0)
 					//debug
-					auto end = std::chrono::high_resolution_clock::now();
-					auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-					std::cout << "电文发送执行时间: " << duration.count() << " 微秒" << std::endl;
+					//auto end = std::chrono::high_resolution_clock::now();
+					//auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+					//std::cout << "电文发送执行时间: " << duration.count() << " 微秒" << std::endl;
 					continue;  //继续处理其他消息                    
 				}  //end if(sendsize > 0)
 				//能走到这里，应该是有点问题的

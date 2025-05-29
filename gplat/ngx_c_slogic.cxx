@@ -795,7 +795,7 @@ bool CLogicSocket::HandlePostWait(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER p
 	}
 	else
 	{
-		int dwWaitingTime = pPkgHead->error;
+		int dwWaitingTime = pPkgHead->timeout;
 		if (dwWaitingTime == -1)
 		{
 			pConn->m_bWaitingPost = true;
@@ -858,9 +858,10 @@ void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader)
 			ptmpMsgHeader->pConn = pConn;
 			ptmpMsgHeader->iCurrsequence = ptmpMsgHeader->pConn->iCurrsequence;
 			//c)填充包头
-			memcpy(p_sendbuf + m_iLenMsgHeader, pPkgHeader, m_iLenPkgHeader);         //包头直接拷贝到这里来
-			PPKGHEAD pPkgHead = (PPKGHEAD)pPkgHeader; //包头
+			//memcpy(p_sendbuf + m_iLenMsgHeader, pPkgHeader, m_iLenPkgHeader);         //包头直接拷贝到这里来
+			PPKGHEAD pPkgHead = (PPKGHEAD)(p_sendbuf + m_iLenMsgHeader); //包头
 			pPkgHead->id = POST;	//发布事件
+			strcpy(pPkgHead->itemname, tagName.c_str());	//必须的，因为最终发布事件的时候是用的itemname
 			pPkgHead->bodysize = 0;	//防御性编程，只发布事件，不发布数据
 
 			//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程
@@ -869,6 +870,7 @@ void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader)
 			switch (subscriber.eventid)
 			{
 			case EVENTID::DEFAULT:
+				ngx_log_stderr(0, "-------------------CLogicSocket::NotifySubscriber() 事件名=%s, eventarg=%d", pPkgHead->itemname, subscriber.eventarg);
 				if (pConn->m_bWaitingTimeout)
 				{
 					pConn->m_bWaitingTimeout = false;
@@ -885,51 +887,76 @@ void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgHeader)
 					pConn->m_listPost.push_back(p_sendbuf);
 				}
 				break;
-				//		case EVENTID::POST_DELAY:
-				//			NotifySubscriberOnDelayTime(subscriber.eventname, subscriber.eventarg, (ClientContext*)subscriber.subscriber, pOverlapBuff);
-				//			break;
-						/*
-						case EVENTID::NOT_EQUAL_ZERO:
-							value = *(SHORT*)pMsg->body;
-							if (value != 0)
-							{
-								TCHAR itemname[32];
-								wcscpy_s(itemname, pMsg->head.itemname);
-								wcscpy_s(pMsg->head.itemname, subscriber.eventname);	//换成用户定义的事件名
-								SendMsg((ClientContext*)subscriber.subscriber, pOverlapBuff);
-								wcscpy_s(pMsg->head.itemname, itemname);				//还原
-							}
-							else
-								pOverlapBuff->DecRef();
-							break;
-						case EVENTID::NOT_EQUAL_ZERO | EVENTID::POST_DELAY:
-							value = *(SHORT*)pMsg->body;
-							if (value != 0)
-								NotifySubscriberOnDelayTime(subscriber.eventname, subscriber.eventarg, (ClientContext*)subscriber.subscriber, pOverlapBuff);
-							else
-								pOverlapBuff->DecRef();
-							break;
-						case EVENTID::EQUAL_ZERO:
-							value = *(SHORT*)pMsg->body;
-							if (value == 0)
-							{
-								TCHAR itemname[32];
-								wcscpy_s(itemname, pMsg->head.itemname);
-								wcscpy_s(pMsg->head.itemname, subscriber.eventname);	//换成用户定义的事件名
-								SendMsg((ClientContext*)subscriber.subscriber, pOverlapBuff);
-								wcscpy_s(pMsg->head.itemname, itemname);				//还原
-							}
-							else
-								pOverlapBuff->DecRef();
-							break;
-						case EVENTID::EQUAL_ZERO | EVENTID::POST_DELAY:
-							value = *(SHORT*)pMsg->body;
-							if (value == 0)
-								NotifySubscriberOnDelayTime(subscriber.eventname, subscriber.eventarg, (ClientContext*)subscriber.subscriber, pOverlapBuff);
-							else
-								pOverlapBuff->DecRef();
-							break;
-						*/
+			case EVENTID::POST_DELAY:
+				//NotifySubscriberOnDelayTime(subscriber.eventname, subscriber.eventarg, (ClientContext*)subscriber.subscriber, pOverlapBuff);
+				strcpy(pPkgHead->itemname, subscriber.eventname);	//必须的，因为最终发布事件的时候是用的itemname
+				ngx_log_stderr(0, "CLogicSocket::NotifySubscriber() 事件名=%s, eventarg=%d", pPkgHead->itemname, subscriber.eventarg);
+				g_tm.add_once(subscriber.eventarg, [](void* arg) {
+					char* p_sendbuf = (char*)arg;
+					LPSTRUC_MSG_HEADER ptmpMsgHeader = (LPSTRUC_MSG_HEADER)p_sendbuf;
+					lpngx_connection_t pconn = ptmpMsgHeader->pConn;
+					PPKGHEAD pPkgHead = (PPKGHEAD)(p_sendbuf + sizeof(STRUC_MSG_HEADER));
+					if (pconn->m_bWaitingTimeout)
+					{
+						pconn->m_bWaitingTimeout = false;
+						pconn->StopTimeoutTimer();
+					}
+
+					if (pconn->m_bWaitingPost)
+					{
+						pconn->m_bWaitingPost = false;
+						g_socket.msgSend(p_sendbuf);
+						ngx_log_stderr(0, "CLogicSocket::NotifySubscriber() 发送延时事件成功，eventname=%s, eventarg=%d", pPkgHead->itemname, pconn->m_bWaitingPost);
+					}
+					else
+					{
+						pconn->m_listPost.push_back(p_sendbuf);
+					}
+					},
+					p_sendbuf);
+				break;
+				/*
+				case EVENTID::NOT_EQUAL_ZERO:
+					value = *(SHORT*)pMsg->body;
+					if (value != 0)
+					{
+						TCHAR itemname[32];
+						wcscpy_s(itemname, pMsg->head.itemname);
+						wcscpy_s(pMsg->head.itemname, subscriber.eventname);	//换成用户定义的事件名
+						SendMsg((ClientContext*)subscriber.subscriber, pOverlapBuff);
+						wcscpy_s(pMsg->head.itemname, itemname);				//还原
+					}
+					else
+						pOverlapBuff->DecRef();
+					break;
+				case EVENTID::NOT_EQUAL_ZERO | EVENTID::POST_DELAY:
+					value = *(SHORT*)pMsg->body;
+					if (value != 0)
+						NotifySubscriberOnDelayTime(subscriber.eventname, subscriber.eventarg, (ClientContext*)subscriber.subscriber, pOverlapBuff);
+					else
+						pOverlapBuff->DecRef();
+					break;
+				case EVENTID::EQUAL_ZERO:
+					value = *(SHORT*)pMsg->body;
+					if (value == 0)
+					{
+						TCHAR itemname[32];
+						wcscpy_s(itemname, pMsg->head.itemname);
+						wcscpy_s(pMsg->head.itemname, subscriber.eventname);	//换成用户定义的事件名
+						SendMsg((ClientContext*)subscriber.subscriber, pOverlapBuff);
+						wcscpy_s(pMsg->head.itemname, itemname);				//还原
+					}
+					else
+						pOverlapBuff->DecRef();
+					break;
+				case EVENTID::EQUAL_ZERO | EVENTID::POST_DELAY:
+					value = *(SHORT*)pMsg->body;
+					if (value == 0)
+						NotifySubscriberOnDelayTime(subscriber.eventname, subscriber.eventarg, (ClientContext*)subscriber.subscriber, pOverlapBuff);
+					else
+						pOverlapBuff->DecRef();
+					break;
+				*/
 			default:
 				//pOverlapBuff->DecRef();
 				ngx_log_stderr(0, "ERROR:unknown eventid");
@@ -983,6 +1010,15 @@ void CLogicSocket::NotifyTimerSubscriber(std::string timerName)
 			pConn->m_listPost.push_back(p_sendbuf);
 		}
 	}
+}
+
+void CLogicSocket::CancelSubscribe(lpngx_connection_t pConn, const std::list<std::string>& tagList)
+{
+	for (auto tag : tagList)
+	{
+		m_subscriber.Detach(tag, pConn);
+	}
+	pConn->ClearTagList();
 }
 
 bool CLogicSocket::HandleCreateItem(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)

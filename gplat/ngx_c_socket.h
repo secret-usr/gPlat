@@ -145,6 +145,8 @@ public:
 
 	int ngx_epoll_oper_event(int fd,uint32_t eventtype,uint32_t flag,int bcaction,lpngx_connection_t pConn); 
 
+	virtual void CancelSubscribe(lpngx_connection_t pConn, const std::list<std::string>& tagList) {};
+
 //gyb 没办法，超时后要用CLogicSocket全局对象调用此方法发送数据，所以这里要公开	
 //protected:
 	//数据发送相关

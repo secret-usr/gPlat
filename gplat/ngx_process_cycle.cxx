@@ -223,40 +223,40 @@ static void ngx_worker_process_init(int inum)
 		//启动定时器线程
 		g_tm.start();
 
-		//启动0.5秒定时器
-		g_tm.add_periodic(500, [](void* user) {
-			std::cout << "500毫秒定时器时间到" << std::endl;
-			g_socket.NotifyTimerSubscriber("timer_500ms"); //通知定时器到达了
-			},
-			nullptr);
+		////启动0.5秒定时器
+		//g_tm.add_periodic(500, [](void* user) {
+		//	std::cout << "500毫秒定时器时间到" << std::endl;
+		//	g_socket.NotifyTimerSubscriber("timer_500ms"); //通知定时器到达了
+		//	},
+		//	nullptr);
 
 		//启动1秒定时器
-		g_tm.add_periodic(1000, [](void* user) {
-			std::cout << "1秒定时器时间到" << std::endl;
-			g_socket.NotifyTimerSubscriber("timer_1s"); //通知定时器到达了
-			},
-			nullptr);
+		//g_tm.add_periodic(1000, [](void* user) {
+		//	std::cout << "1秒定时器时间到" << std::endl;
+		//	g_socket.NotifyTimerSubscriber("timer_1s"); //通知定时器到达了
+		//	},
+		//	nullptr);
 
-		//启动2秒定时器
-		g_tm.add_periodic(2000, [](void* user) {
-			std::cout << "2秒定时器时间到" << std::endl;
-			g_socket.NotifyTimerSubscriber("timer_2s"); //通知定时器到达了
-			},
-			nullptr);
+		////启动2秒定时器
+		//g_tm.add_periodic(2000, [](void* user) {
+		//	std::cout << "2秒定时器时间到" << std::endl;
+		//	g_socket.NotifyTimerSubscriber("timer_2s"); //通知定时器到达了
+		//	},
+		//	nullptr);
 
-		//启动3秒定时器
-		g_tm.add_periodic(3000, [](void* user) {
-			std::cout << "3秒定时器时间到" << std::endl;
-			g_socket.NotifyTimerSubscriber("timer_3s"); //通知定时器到达了
-			},
-			nullptr);
+		////启动3秒定时器
+		//g_tm.add_periodic(3000, [](void* user) {
+		//	std::cout << "3秒定时器时间到" << std::endl;
+		//	g_socket.NotifyTimerSubscriber("timer_3s"); //通知定时器到达了
+		//	},
+		//	nullptr);
 
-		//启动5秒定时器
-		g_tm.add_periodic(5000, [](void* user) {
-			std::cout << "-------------5秒定时器时间到" << std::endl;
-			g_socket.NotifyTimerSubscriber("timer_5s"); //通知定时器到达了
-			},
-			nullptr);
+		////启动5秒定时器
+		//g_tm.add_periodic(5000, [](void* user) {
+		//	std::cout << "-------------5秒定时器时间到" << std::endl;
+		//	g_socket.NotifyTimerSubscriber("timer_5s"); //通知定时器到达了
+		//	},
+		//	nullptr);
 	}
 	catch (const std::exception& e) {
 		std::cerr << "Error: " << e.what() << std::endl;

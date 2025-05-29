@@ -75,6 +75,7 @@ typedef struct {
 	int    arraysize;	// used for plc array write
 	int	   eventid;
 	int    eventarg;
+	int    timeout;
 } MSGHEAD, * PMSGHEAD;
 
 typedef MSGHEAD PKGHEAD;

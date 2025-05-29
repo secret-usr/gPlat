@@ -1075,6 +1075,53 @@ extern "C" bool subscribe(int sockfd, const char* tagname, unsigned int* error)
 	return (*error == 0);
 }
 
+extern "C" bool subscribedelaypost(int sockfd, const char* tagname, const char* eventname, int delaytime, unsigned int* error)
+{
+	// 参数校验
+	if (!tagname || !eventname || !error) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	// 初始化消息结构体
+	MSGSTRUCT msg{};
+	msg.head.id = SUBSCRIBE;
+	msg.head.eventid = EVENTID::POST_DELAY;
+	msg.head.eventarg = delaytime;
+	msg.head.bodysize = 0;
+
+	// 安全拷贝字符串（防止缓冲区溢出）
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+
+	strncpy(msg.head.qname, eventname, sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	// 发送请求
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取响应
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 验证响应
+	if (msg.head.bodysize > 0) {
+		*error = ERROR_INVALID_RESPONSE;
+		close(sockfd);
+		return false;
+	}
+
+	*error = msg.head.error;
+	return (*error == 0);
+}
+
 extern "C" bool createtag(int sockfd, const char* tagname, int tagsize, void* type, int typesize, unsigned int* error)
 {
 	// 参数校验
@@ -1138,7 +1185,7 @@ extern "C" bool waitpostdata(int sockfd, std::string& tagname, int timeout, unsi
 	//绝对不能在本地实现超时，否则容易出现问题
 	MSGSTRUCT msg{};
 	msg.head.id = POSTWAIT;
-	msg.head.error = timeout;  // 或 htonl(timeout)
+	msg.head.timeout = timeout;  // 或 htonl(timeout)
 	msg.head.bodysize = 0;
 
 	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {

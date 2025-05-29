@@ -36,8 +36,13 @@ void CSocekt::ngx_read_request_handler(lpngx_connection_t pConn)
 	ssize_t reco = recvproc(pConn, pConn->precvbuf, pConn->irecvlen);
 	if (reco <= 0)
 	{
+		//如果是recvproc()函数返回<=0，表示有问题发生了，可能是对端断开了连接，也可能是其他错误发生了；
+		
 		//gyb
 		CLock lock(&pConn->logicPorcMutex);
+
+		CancelSubscribe(pConn, pConn->GetTagList());
+	
 		if (pConn->m_bWaitingTimeout)
 		{
 			pConn->m_bWaitingTimeout = false;

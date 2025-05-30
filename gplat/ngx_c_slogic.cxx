@@ -862,8 +862,8 @@ void CLogicSocket::NotifySubscriber(std::string tagName)
 			PPKGHEAD pPkgHead = (PPKGHEAD)(p_sendbuf + m_iLenMsgHeader); //包头
 			pPkgHead->id = POST;	//发布事件
 			strcpy(pPkgHead->itemname, tagName.c_str());	//必须的，因为最终发布事件的时候是用的itemname
-			pPkgHead->error = 0;	//发布事件不需要错误码
-			pPkgHead->bodysize = 0;	//防御性编程，只发布事件，不发布数据
+			pPkgHead->error = 0;	//发布事件不需要错误码，而且包头是在堆上分配的，所以error值是随机的（而且很有可能是上一次分配的同一块内存的值），必须设置为0
+			pPkgHead->bodysize = 0;	//防御性编程，只发布事件，不发布数据，现在不是防御性的了，因为包头是在堆上分配的，所以bodysize值是随机的，必须设置为0
 
 			//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程
 			CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥

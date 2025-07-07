@@ -82,7 +82,7 @@ int main(int argc, char* const* argv)
 
 	//(0)先初始化的变量
 	g_stopEventChild = 0;            //标记子进程是否退出，0不退出
-	g_stopEventMain  = 0;            //标记主进程是否退出，0不退出
+	g_stopEventMain = 0;            //标记主进程是否退出，0不退出
 
 	//(1)无伤大雅也不需要释放的放最上边    
 	ngx_pid = getpid();			//取得进程pid

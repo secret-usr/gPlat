@@ -108,4 +108,7 @@
     </ClInclude>
     <ClInclude Include="CSubscribe.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="CMakeLists.txt" />
+  </ItemGroup>
 </Project>

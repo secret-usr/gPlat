@@ -119,6 +119,9 @@
     <ClInclude Include="ngx_macro.h" />
     <ClInclude Include="ngx_signal.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="CMakeLists.txt" />
+  </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>
       <AdditionalLibraryDirectories>$(RemoteRootDir)/$(Platform)/$(Configuration);%(Link.AdditionalLibraryDirectories)</AdditionalLibraryDirectories>

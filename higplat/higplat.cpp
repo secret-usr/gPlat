@@ -1871,7 +1871,7 @@ extern "C" bool ClearB(const char* lpBoardName)
 
 	int totalsize = pHead->totalsize;
 	int typesize = pHead->typesize;
-	int fileSize = pHead->totalsize + pHead->typesize;
+	// int fileSize = pHead->totalsize + pHead->typesize;
 	//ZeroMemory((char*)pHead->index, sizeof(pHead->index));
 	memset((char*)pHead->index, 0, sizeof(pHead->index));
 	pHead->qbdtype = BOARD_T;
@@ -2633,7 +2633,7 @@ extern "C" bool ClearDB(const char* lpDbName)
 
 	int totalsize = pHead->totalsize;
 	int typesize = pHead->typesize;
-	int fileSize = pHead->totalsize + pHead->typesize;
+	// int fileSize = pHead->totalsize + pHead->typesize;
 	//ZeroMemory((char*)pHead->index, sizeof(pHead->index));
 	memset((char*)pHead->index, 0, sizeof(pHead->index));
 	pHead->qbdtype = DATABASE_T;

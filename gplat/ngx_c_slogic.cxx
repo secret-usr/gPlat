@@ -164,7 +164,7 @@ bool CLogicSocket::_HandleRegister(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER 
 	CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
 
 	//(3)取得了整个发送过来的数据
-	LPSTRUCT_REGISTER p_RecvInfo = (LPSTRUCT_REGISTER)pPkgBody;
+	// LPSTRUCT_REGISTER p_RecvInfo = (LPSTRUCT_REGISTER)pPkgBody;
 
 	//(4)这里可能要考虑 根据业务逻辑，进一步判断收到的数据的合法性，
 	   //当前该玩家的状态是否适合收到这个数据等等【比如如果用户没登陆，它就不适合购买物品等等】

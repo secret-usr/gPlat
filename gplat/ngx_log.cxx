@@ -231,7 +231,7 @@ void ngx_log_error_core(int level, int err, const char* fmt, ...)
 void ngx_log_init()
 {
 	u_char* plogname = NULL;
-	size_t nlen;
+	// size_t nlen;
 
 	//从配置文件中读取和日志相关的配置信息
 	CConfig* p_config = CConfig::GetInstance();

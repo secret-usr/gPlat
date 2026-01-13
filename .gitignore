@@ -362,3 +362,8 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /include - 副本/hello.h
+
+# Build output folders
+build/
+lib/
+bin/

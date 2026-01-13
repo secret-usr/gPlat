@@ -5,7 +5,11 @@
 #include <chrono>
 #include <mutex>
 
+#ifdef _WIN32
 #define DllImport   __declspec( dllimport )
+#else
+#define DllImport
+#endif
 
 #define ERROR_DQFILE_NOT_FOUND			0x20000000L
 #define ERROR_DQ_NOT_OPEN				0x20000001L

@@ -3,44 +3,47 @@
 
 #define MAXDQNAMELENTH 40	// 必须和higplat.h中的定义一致
 
-#define ERROR_DQFILE_NOT_FOUND			0x00000000L
-#define ERROR_DQ_NOT_OPEN				0x00000001L
-#define ERROR_DQ_EMPTY					0x00000002L
-#define ERROR_DQ_FULL					0x00000003L
-#define ERROR_FILENAME_TOO_LONG			0x00000004L
-#define ERROR_FILE_IN_USE				0x00000005L
-#define ERROR_FILE_CREATE_FAILSURE		0x00000006L
-#define ERROR_FILE_OPEN_FAILSURE		0x00000007L
-#define ERROR_CREATE_FILEMAPPINGOBJECT	0x00000008L
-#define ERROR_OPEN_FILEMAPPINGOBJECT	0x00000009L
-#define ERROR_MAPVIEWOFFILE				0x0000000AL
-#define ERROR_CREATE_MUTEX				0x0000000BL
-#define ERROR_OPEN_MUTEX				0x0000000CL
-#define ERROR_RECORDSIZE				0x0000000DL
-#define ERROR_STARTPOSITION				0x0000000EL
-#define ERROR_RECORD_ALREAD_EXIST		0x0000000FL
-#define ERROR_TABLE_OVERFLOW			0x00000010L
-#define ERROR_RECORD_NOT_EXIST			0x00000011L
-#define ERROR_OPERATE_PROHIBIT			0x00000012L
-#define ERROR_ALREADY_OPEN				0x00000013L
-#define ERROR_ALREADY_CLOSE				0x00000014L
-#define ERROR_ALREADY_LOAD				0x00000015L
-#define ERROR_ALREADY_UNLOAD			0x00000016L
-#define ERROR_NO_SPACE			        0x00000017L
-#define ERROR_TABLE_NOT_EXIST			0x00000018L
-#define ERROR_TABLE_ALREADY_EXIST		0x00000019L
-#define ERROR_TABLE_ROWID				0x0000001AL
-#define ERROR_ITEM_NOT_EXIST			0x0000001BL
-#define ERROR_ITEM_ALREADY_EXIST		0x0000001CL
-#define ERROR_ITEM_OVERFLOW				0x0000001DL
-#define ERROR_SOCKET_NOT_CONNECTED      0x0000001EL
-#define ERROR_MSGSIZE			        0x0000001FL
-#define ERROR_BUFFER_SIZE		        0x00000020L
-#define ERROR_PARAMETER_SIZE	        0x00000021L
-#define CODE_QEMPTY						0x00000022L
-#define CODE_QFULL						0x00000023L
-#define STRING_TOO_LONG					0x00000024L
-#define BUFFER_TOO_SMALL				0x00000025L
+#define ERROR_DQFILE_NOT_FOUND			1
+#define ERROR_DQ_NOT_OPEN				2
+#define ERROR_DQ_EMPTY					3
+#define ERROR_DQ_FULL					4
+#define ERROR_FILENAME_TOO_LONG			5
+#define ERROR_FILE_IN_USE				6
+#define ERROR_FILE_CREATE_FAILSURE		7
+#define ERROR_FILE_OPEN_FAILSURE		8
+#define ERROR_CREATE_FILEMAPPINGOBJECT	9
+#define ERROR_OPEN_FILEMAPPINGOBJECT	10
+#define ERROR_MAPVIEWOFFILE				11
+#define ERROR_CREATE_MUTEX				12
+#define ERROR_OPEN_MUTEX				13
+#define ERROR_RECORDSIZE				14
+#define ERROR_STARTPOSITION				15
+#define ERROR_RECORD_ALREAD_EXIST		16
+#define ERROR_TABLE_OVERFLOW			17
+#define ERROR_RECORD_NOT_EXIST			18
+#define ERROR_OPERATE_PROHIBIT			19
+#define ERROR_ALREADY_OPEN				20
+#define ERROR_ALREADY_CLOSE				21
+#define ERROR_ALREADY_LOAD				22
+#define ERROR_ALREADY_UNLOAD			23
+#define ERROR_NO_SPACE			        24
+#define ERROR_TABLE_NOT_EXIST			25
+#define ERROR_TABLE_ALREADY_EXIST		26
+#define ERROR_TABLE_ROWID				27
+#define ERROR_ITEM_NOT_EXIST			28
+#define ERROR_ITEM_ALREADY_EXIST		29
+#define ERROR_ITEM_OVERFLOW				30
+#define ERROR_SOCKET_NOT_CONNECTED      31
+#define ERROR_MSGSIZE			        32
+#define ERROR_BUFFER_SIZE		        33
+#define ERROR_PARAMETER_SIZE	        34
+#define CODE_QEMPTY						35
+#define CODE_QFULL						36
+#define STRING_TOO_LONG					37
+#define BUFFER_TOO_SMALL				38
+#define ERROR_INVALID_PARAMETER			39
+#define ERROR_INVALID_RESPONSE			40
+#define ERROR_BUFFER_TOO_SMALL			41
 
 #define SHIFT_MODE		1
 #define NORMAL_MODE		0
@@ -56,9 +59,9 @@ enum{
 };
 #define MUTEXSIZE	  64	// 一个BOARD或DB中读写锁的数量，必须是2的n次幂 mark，必须和dataqueue.h中的定义一致
 #define TABLESIZE     277	// 必须为质数
-#define INDEXSIZE     9973	// 必须为质数，必须和dataqueue.h中的定义一致
+#define INDEXSIZE     7177 	// 必须为质数，必须和higplat.h中的定义一致
 #define TYPEMAXSIZE   2048  // 数据类型的最大序列化长度   必须与msg.h中的MAXMSGLEN一致	//mark 与QbdServer项目中MyIOCP::HandleSUBSCRIBE里的缓冲区大小有矛盾，似乎没必要那么大
-#define TYPEAVGSIZE	  128	// 数据类型的平均序列化长度	mark
+#define TYPEAVGSIZE	  32	// 数据类型的平均序列化长度	mark
 
 #pragma pack( push, enter_dq_h_, 8)
 
@@ -134,6 +137,7 @@ struct BOARD_INDEX_STRUCT
 	char  itemname[MAXDQNAMELENTH];
 	int    startpos;		// reference to the beginning of date part.
 	int    itemsize;
+	int    strlenth;		// 字符串长度(不包括'\0')
 	bool   erased;			// 表删除标志
 	timespec timestamp;		// write time
 	int	   typeaddr;		// 类型起始地址

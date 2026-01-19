@@ -45,12 +45,20 @@ void ngx_connection_s::GetOneToUse()
 
 	curStat = _PKG_HD_INIT;                           //收包状态处于 初始状态，准备接收数据包头【状态机】
 	precvbuf = dataHeadInfo;                          //收包我要先收到这里来，因为我要先收包头，所以收数据的buff直接就是dataHeadInfo
-	irecvlen = sizeof(COMM_PKG_HEADER);               //这里指定收数据的长度，这里先要求收包头这么长字节的数据
+
+	//gyb
+	//irecvlen = sizeof(COMM_PKG_HEADER);               //这里指定收数据的长度，这里先要求收包头这么长字节的数据
+	irecvlen = sizeof(MSGHEAD);               //这里指定收数据的长度，这里先要求收包头这么长字节的数据
 
 	precvMemPointer = NULL;                           //既然没new内存，那自然指向的内存地址先给NULL
 	iThrowsendCount = 0;                              //原子的
 	psendMemPointer = NULL;                           //发送数据头指针记录
 	events = 0;                              //epoll事件先给0 
+
+	//gyb
+	m_bWaitingPost = false;
+	m_bWaitingTimeout = false;
+	m_timerID = -1;
 }
 
 //回收回来一个连接的时候做一些事
@@ -68,7 +76,10 @@ void ngx_connection_s::PutOneToFree()
 		psendMemPointer = NULL;
 	}
 
-	iThrowsendCount = 0;                              //设置不设置感觉都行         
+	iThrowsendCount = 0;                              //设置不设置感觉都行 
+
+	//gyb
+	this->ClearTagList();
 }
 
 //---------------------------------------------------------------
@@ -196,29 +207,6 @@ void CSocekt::ngx_free_connection(lpngx_connection_t pConn)
 	//空闲连接数+1
 	++m_free_connection_n;
 
-	/*
-	if(c->precvMemPointer != NULL)
-	{
-		//我们曾经给这个连接分配过内存，则要释放内存
-		CMemory::GetInstance()->FreeMemory(c->precvMemPointer);
-		c->precvMemPointer = NULL;
-		//c->ifnewrecvMem = false;  //这行有用？
-	}
-	if(c->psendMemPointer != NULL) //如果发送数据的缓冲区里有内容，则要释放内存
-	{
-		CMemory::GetInstance()->FreeMemory(c->psendMemPointer);
-		c->psendMemPointer = NULL;
-	}
-
-	c->next = m_pfree_connections;                       //回收的节点指向原来串起来的空闲链的链头
-
-	//节点本身也要干一些事
-	++c->iCurrsequence;                                  //回收后，该值就增加1,以用于判断某些网络事件是否过期【一被释放就立即+1也是有必要的】
-	c->iThrowsendCount = 0;                              //设置不设置感觉都行
-
-	m_pfree_connections = c;                             //修改 原来的链头使链头指向新节点
-	++m_free_connection_n;                               //空闲连接多1
-	*/
 	return;
 }
 
@@ -251,6 +239,7 @@ void* CSocekt::ServerRecyConnectionThread(void* threadData)
 
 	while (1)
 	{
+		//mark
 		//为简化问题，我们直接每次休息200毫秒
 		usleep(200 * 1000);  //单位是微妙,又因为1毫秒=1000微妙，所以 200 *1000 = 200毫秒
 
@@ -268,7 +257,7 @@ void* CSocekt::ServerRecyConnectionThread(void* threadData)
 			{
 				p_Conn = (*pos);
 				if (
-					((p_Conn->inRecyTime + pSocketObj->m_RecyConnectionWaitTime) > currtime) && (g_stopEvent == 0) //如果不是要整个系统退出，你可以continue，否则就得要强制释放
+					((p_Conn->inRecyTime + pSocketObj->m_RecyConnectionWaitTime) > currtime) && (g_stopEventChild == 0) //如果不是要整个系统退出，你可以continue，否则就得要强制释放
 					)
 				{
 					continue; //没到释放的时间
@@ -298,7 +287,7 @@ void* CSocekt::ServerRecyConnectionThread(void* threadData)
 			if (err != 0)  ngx_log_stderr(err, "CSocekt::ServerRecyConnectionThread()pthread_mutex_unlock()失败，返回的错误码为%d!", err);
 		} //end if
 
-		if (g_stopEvent == 1) //要退出整个程序，那么肯定要先退出这个循环
+		if (g_stopEventChild == 1) //要退出整个程序，那么肯定要先退出这个循环
 		{
 			if (pSocketObj->m_totol_recyconnection_n > 0)
 			{

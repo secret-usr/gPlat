@@ -8,7 +8,7 @@ void Usage(char* pszProgramName);
 
 int main(int argc, char* argv[])
 {
-	char*  lpname;
+	char* lpname;
 	uint number, size, mode, type;
 	lpname = NULL;
 	number = 0;
@@ -31,14 +31,14 @@ int main(int argc, char* argv[])
 				size = (uint)atoi(argv[++i]);
 				break;
 
-			//case 'b':
-			//	type = BINARY_TYPE;
-			//	break;
+				//case 'b':
+				//	type = BINARY_TYPE;
+				//	break;
 
 			case 's':
 				mode = SHIFT_MODE;
 				break;
-			// Help.
+				// Help.
 			case 'h':
 			case '?':
 			default:

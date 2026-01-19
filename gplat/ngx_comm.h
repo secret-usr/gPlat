@@ -1,9 +1,12 @@
-﻿
+﻿#include "../include/msg.h"
+
 #ifndef __NGX_COMM_H__
 #define __NGX_COMM_H__
 
 //宏定义------------------------------------
-#define _PKG_MAX_LENGTH     30000  //每个包的最大长度【包头+包体】不超过这个数字，为了留出一些空间，实际上编码是，包头+包体长度必须不大于 这个值-1000【29000】
+//gyb
+//#define _PKG_MAX_LENGTH     30000  //每个包的最大长度【包头+包体】不超过这个数字，为了留出一些空间，实际上编码是，包头+包体长度必须不大于 这个值-1000【29000】
+#define _PKG_MAX_LENGTH     128000  //每个包的最大长度【包头+包体】不超过这个数字，为了留出一些空间，实际上编码是，包头+包体长度必须不大于 这个值-1000【127000】
 
 //通信 收包状态定义
 #define _PKG_HD_INIT         0  //初始状态，准备接收数据包头
@@ -12,8 +15,9 @@
 #define _PKG_BD_RECVING      3  //接收包体中，包体不完整，继续接收中，处理后直接回到_PKG_HD_INIT状态
 //#define _PKG_RV_FINISHED     4  //完整包收完，这个状态似乎没什么 用处
 
-#define _DATA_BUFSIZE_       20  //因为我要先收包头，我希望定义一个固定大小的数组专门用来收包头，这个数字大小一定要 >sizeof(COMM_PKG_HEADER) ,所以我这里定义为20绰绰有余；
+//#define _DATA_BUFSIZE_       20  //因为我要先收包头，我希望定义一个固定大小的数组专门用来收包头，这个数字大小一定要 >sizeof(COMM_PKG_HEADER) ,所以我这里定义为20绰绰有余；
                                   //如果日后COMM_PKG_HEADER大小变动，这个数字也要做出调整以满足 >sizeof(COMM_PKG_HEADER) 的要求
+#define _DATA_BUFSIZE_       sizeof(MSGHEAD)
 
 //结构定义------------------------------------
 #pragma pack (1) //对齐方式,1字节对齐【结构之间成员不做任何字节对齐：紧密的排列在一起】

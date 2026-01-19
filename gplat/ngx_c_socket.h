@@ -1,5 +1,4 @@
-﻿
-#ifndef __NGX_SOCKET_H__
+﻿#ifndef __NGX_SOCKET_H__
 #define __NGX_SOCKET_H__
 
 #include <vector>       //vector
@@ -10,7 +9,14 @@
 #include <semaphore.h>  //信号量 
 #include <atomic>       //c++11里的原子操作
 
+#include <iostream> 
+#include <string>      //string
 #include "ngx_comm.h"
+#include "ngx_global.h" //全局变量
+
+//#include "../include/TimerManager.h" // Include the header file for the TimerManager class
+#include "../include/timer_manager.h"
+extern TimerManager   g_tm;			//定时器全局对象
 
 //一些宏定义放在这里-----------------------------------------------------------
 #define NGX_LISTEN_BACKLOG  511    //已完成连接队列，nginx给511，我们也先按照这个来：不懂这个数字的同学参考第五章第四节
@@ -80,6 +86,34 @@ struct ngx_connection_s
 
 	//--------------------------------------------------
 	lpngx_connection_t        next;                           //这是个指针，指向下一个本类型对象，用于把空闲的连接池对象串起来构成一个单向链表，方便取用
+
+	//gyb
+	bool			 m_bWaitingPost{ false };
+	bool			 m_bWaitingTimeout{ false };
+	//获取订阅事件列表
+	const std::list<std::string>& GetTagList()
+	{
+		return m_listTag;
+	}
+
+	const void ClearTagList()
+	{
+		m_listTag.clear();
+	}
+
+	void Attach(std::string tagname)
+	{
+		m_listTag.push_back(tagname);
+	}
+
+	void StartTimeoutTimer(int dwMilliseconds);
+	void StopTimeoutTimer();
+
+	std::list<std::string> m_listTag;	// 订阅的TAG列表
+	std::list<char*> m_listPost;		// 待发送的事件列表
+
+private:
+	int m_timerID{ -1 };	// 定时器ID
 };
 
 //消息头，引入的目的是当收到数据包时，额外记录一些内容以备将来使用
@@ -110,9 +144,11 @@ public:
 	int  ngx_epoll_process_events(int timer);                             //epoll等待接收和处理事件
 
 	int ngx_epoll_oper_event(int fd,uint32_t eventtype,uint32_t flag,int bcaction,lpngx_connection_t pConn); 
-	                                                                      //epoll操作事件
-	
-protected:
+
+	virtual void CancelSubscribe(lpngx_connection_t pConn, const std::list<std::string>& tagList) {};
+
+//gyb 没办法，超时后要用CLogicSocket全局对象调用此方法发送数据，所以这里要公开	
+//protected:
 	//数据发送相关
 	void msgSend(char *psendbuf);                                         //把数据扔到待发送对列中 
 
@@ -148,10 +184,15 @@ private:
 	//线程相关函数
 	static void* ServerSendQueueThread(void *threadData);                 //专门用来发送数据的线程
 	static void* ServerRecyConnectionThread(void *threadData);            //专门用来回收连接的线程
+	//gyb
+	//static void* ServerTimerManagerThread(void* threadData);              //专门用来实现定时器的线程
+	//static void  timer_callback(void* arg);
 	
 protected:
 	//一些和网络通讯有关的成员变量
-	size_t                         m_iLenPkgHeader;                       //sizeof(COMM_PKG_HEADER);		
+	//gyb
+	//size_t                         m_iLenPkgHeader;                       //sizeof(COMM_PKG_HEADER);
+	size_t                         m_iLenPkgHeader;                       //sizeof(MSGHEAD)
 	size_t                         m_iLenMsgHeader;                       //sizeof(STRUC_MSG_HEADER);
 	
 private:

@@ -22,8 +22,13 @@
 #include "ngx_c_crc32.h"       //和crc32校验算法有关 
 #include "ngx_c_slogic.h"      //和socket通讯相关
 
+//#include "../include/TimerManager.h"
+#include "../include/timer_manager.h"
+
 //本文件用的函数声明
 static void freeresource();
+//gyb
+static bool gplat_load_qbd();
 
 //和设置标题有关的全局量
 size_t  g_argvneedmem = 0;        //保存下这些argv参数所需要的内存大小
@@ -34,15 +39,22 @@ char* gp_envmem = NULL;        //指向自己分配的env环境变量的内存�
 int     g_daemonized = 0;         //守护进程标记，标记是否启用了守护进程模式，0：未启用，1：启用了
 
 //socket/线程池相关
-//CSocekt      g_socket;          //socket全局对象
+//CSocekt      g_socket;        //socket全局对象
 CLogicSocket   g_socket;        //socket全局对象  
 CThreadPool    g_threadpool;    //线程池全局对象
+TimerManager   g_tm;			//定时器全局对象(在构造函数里启动了定时器线程)
 
 //和进程本身有关的全局量
 pid_t   ngx_pid;                //当前进程的pid
 pid_t   ngx_parent;             //父进程的pid
 int     ngx_process;            //进程类型，比如master,worker进程等
-int     g_stopEvent;            //标志程序退出,0不退出1，退出
+//gyb
+//int     g_stopEvent;            //标志程序退出,0不退出1退出
+int     g_stopEventChild;         //子进程退出标志,0不退出1退出
+int     g_stopEventMain;          //主程序退出标志,0不退出1退出
+
+//gyb 控制子进程退出的socketpair
+int sockpair[2];
 
 sig_atomic_t  ngx_reap;         //标记子进程状态变化[一般是子进程发来SIGCHLD信号表示退出],sig_atomic_t:系统定义的类型：访问或改变这些变量需要在计算机的一条指令内完成
 //一般等价于int【通常情况下，int类型的变量通常是原子访问的，也可以认为 sig_atomic_t就是int类型的数据】                                   
@@ -50,17 +62,30 @@ sig_atomic_t  ngx_reap;         //标记子进程状态变化[一般是子进程
 //程序主入口函数----------------------------------
 int main(int argc, char* const* argv)
 {
-	//printf("%u,%u,%u",EPOLLERR ,EPOLLHUP,EPOLLRDHUP);  
-	//exit(0);
-
 	int exitcode = 0;           //退出代码，先给0表示正常退出
-	int i;                      //临时用
+	int i;
+
+	//gyb 控制子进程退出的socketpair
+	int ret;
+	ret = socketpair(AF_UNIX, SOCK_STREAM, 0, sockpair);
+	if (ret != 0) {
+		perror("socketpair");
+		return 1;
+	}
+
+	//gyb加载qbd
+	if (gplat_load_qbd() == false) //加载qbd
+	{
+		printf("加载qbd失败，退出!\n");
+		return 1;
+	}
 
 	//(0)先初始化的变量
-	g_stopEvent = 0;            //标记程序是否退出，0不退出          
+	g_stopEventChild = 0;            //标记子进程是否退出，0不退出
+	g_stopEventMain = 0;            //标记主进程是否退出，0不退出
 
 	//(1)无伤大雅也不需要释放的放最上边    
-	ngx_pid = getpid();      //取得进程pid
+	ngx_pid = getpid();			//取得进程pid
 	ngx_parent = getppid();     //取得父进程的id 
 	//统计argv所占的内存
 	g_argvneedmem = 0;
@@ -142,14 +167,6 @@ int main(int argc, char* const* argv)
 	//(7)开始正式的主工作流程，主流程一致在下边这个函数里循环，暂时不会走下来，资源释放啥的日后再慢慢完善和考虑    
 	ngx_master_process_cycle(); //不管父进程还是子进程，正常工作期间都在这个函数里循环；
 
-	//--------------------------------------------------------------    
-	//for(;;)    
-	//{
-	//    sleep(1); //休息1秒        
-	//    printf("休息1秒\n");        
-	//}
-
-	//--------------------------------------
 lblexit:
 	//(5)该释放的资源要释放掉
 	ngx_log_stderr(0, "程序退出，再见了!");
@@ -174,4 +191,51 @@ void freeresource()
 		close(ngx_log.fd); //不用判断结果了
 		ngx_log.fd = -1; //标记下，防止被再次close吧        
 	}
+}
+
+//gyb
+#include <filesystem>
+#include <vector>
+#include <string>
+#include <iostream>
+#include "../include/higplat.h"
+
+namespace fs = std::filesystem;
+
+//gyb
+std::vector<std::string> getFilesInDirectory(const std::string& directoryPath) {
+	std::vector<std::string> files;
+
+	try {
+		for (const auto& entry : fs::directory_iterator(directoryPath)) {
+			if (entry.is_regular_file()) {
+				files.push_back(entry.path().filename().string());
+			}
+		}
+	}
+	catch (const fs::filesystem_error& e) {
+		std::cerr << "文件系统错误: " << e.what() << std::endl;
+	}
+
+	return files;
+}
+
+//gyb
+bool gplat_load_qbd()
+{
+	std::string directoryPath = "./qbdfile";
+
+	auto files = getFilesInDirectory(directoryPath);
+
+	std::cout << "目录 " << directoryPath << " 中的文件:" << std::endl;
+	for (const auto& file : files) {
+		std::cout << file << std::endl;
+
+		if (LoadQ(file.c_str()) == false) //把qbd文件内容载入到内存            
+		{
+			ngx_log_stderr(0, "文件[%s]载入失败，退出!", file.c_str());
+			return false;
+		}
+	}
+	return true;
 }

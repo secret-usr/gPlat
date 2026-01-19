@@ -82,6 +82,7 @@
     <TargetExt />
   </PropertyGroup>
   <ItemGroup>
+    <ClCompile Include="CSubscribe.cpp" />
     <ClCompile Include="nginx.cxx" />
     <ClCompile Include="ngx_c_conf.cxx" />
     <ClCompile Include="ngx_c_crc32.cxx" />
@@ -103,6 +104,7 @@
     <ClCompile Include="ngx_string.cxx" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CSubscribe.h" />
     <ClInclude Include="ngx_comm.h" />
     <ClInclude Include="ngx_c_conf.h" />
     <ClInclude Include="ngx_c_crc32.h" />
@@ -117,10 +119,19 @@
     <ClInclude Include="ngx_macro.h" />
     <ClInclude Include="ngx_signal.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="CMakeLists.txt">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+    </Text>
+  </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>
       <AdditionalLibraryDirectories>$(RemoteRootDir)/$(Platform)/$(Configuration);%(Link.AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <LibraryDependencies>higplat</LibraryDependencies>
     </Link>
+    <ClCompile>
+      <CppLanguageStandard>c++17</CppLanguageStandard>
+    </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

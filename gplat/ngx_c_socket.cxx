@@ -25,6 +25,10 @@
 #include "ngx_c_socket.h"
 #include "ngx_c_memory.h"
 #include "ngx_c_lockmutex.h"
+#include <iostream>
+
+//gyb 控制子进程退出的信号量
+extern int sockpair[2]; //socketpair的文件描述符，父进程和子进程之间的通信管道
 
 //--------------------------------------------------------------------------
 //构造函数
@@ -43,7 +47,9 @@ CSocekt::CSocekt()
 	//m_pwrite_events = NULL;      //写事件数组给空
 
 	//一些和网络通讯有关的常用变量值，供后续频繁使用时提高效率
-	m_iLenPkgHeader = sizeof(COMM_PKG_HEADER);    //包头的sizeof值【占用的字节数】
+	//gyb
+	//m_iLenPkgHeader = sizeof(COMM_PKG_HEADER);    //包头的sizeof值【占用的字节数】
+	m_iLenPkgHeader = sizeof(MSGHEAD);    //包头的sizeof值【占用的字节数】
 	m_iLenMsgHeader = sizeof(STRUC_MSG_HEADER);  //消息头的sizeof值【占用的字节数】
 
 	//多线程相关
@@ -107,7 +113,6 @@ bool CSocekt::Initialize_subproc()
 		return false;
 	}
 
-	//---
 	ThreadItem* pRecyconn;    //专门用来回收连接的线程
 	m_threadVector.push_back(pRecyconn = new ThreadItem(this));
 	err = pthread_create(&pRecyconn->_Handle, NULL, ServerRecyConnectionThread, pRecyconn);
@@ -115,6 +120,7 @@ bool CSocekt::Initialize_subproc()
 	{
 		return false;
 	}
+
 	return true;
 }
 
@@ -165,6 +171,8 @@ void CSocekt::Shutdown_subproc()
 	pthread_mutex_destroy(&m_sendMessageQueueMutex);    //发消息互斥量释放    
 	pthread_mutex_destroy(&m_recyconnqueueMutex);       //连接回收队列相关的互斥量释放
 	sem_destroy(&m_semEventSendQueue);                  //发消息相关线程信号量释放
+
+	ngx_log_stderr(0, "CSocekt::Shutdown_subproc()成功返回，线程池中线程全部正常结束!");
 }
 
 //清理TCP发送消息队列
@@ -342,6 +350,15 @@ int CSocekt::ngx_epoll_init()
 	{
 		ngx_log_stderr(errno, "CSocekt::ngx_epoll_init()中epoll_create()失败.");
 		exit(2); //这是致命问题了，直接退，资源由系统释放吧，这里不刻意释放了，比较麻烦
+	}
+
+	// 将socketpair读端加入epoll
+	struct epoll_event ev;
+	ev.events = EPOLLIN;  // 监听可读事件
+	ev.data.fd = sockpair[0];
+	if (epoll_ctl(m_epollhandle, EPOLL_CTL_ADD, sockpair[0], &ev) == -1) {
+		perror("epoll_ctl");
+		exit(EXIT_FAILURE);
 	}
 
 	//(2)创建连接池【数组】、创建出来，这个东西后续用于处理所有客户端的连接
@@ -604,6 +621,19 @@ int CSocekt::ngx_epoll_process_events(int timer)
 	uint32_t           revents;
 	for (int i = 0; i < events; ++i)    //遍历本次epoll_wait返回的所有事件，注意events才是返回的实际事件数量
 	{
+		if (m_events[i].data.fd == sockpair[0]) {
+			// 收到退出通知
+			ngx_log_stderr(0, "收到主进程退出通知");
+			char buf;
+			read(sockpair[0], &buf, 1);  // 读取通知
+			close(sockpair[0]);
+			g_stopEventChild = 1; // 设置退出标志，通知线程退出
+			return 1; // 退出
+			//close(epfd);
+			//exit(EXIT_SUCCESS);
+		}
+		// 处理其他事件...
+
 		p_Conn = (lpngx_connection_t)(m_events[i].data.ptr);           //ngx_epoll_add_event()给进去的，这里能取出来
 
 		/*
@@ -672,7 +702,6 @@ int CSocekt::ngx_epoll_process_events(int timer)
 			(this->* (p_Conn->rhandler))(p_Conn);    //注意括号的运用来正确设置优先级，防止编译出错；【如果是个新客户连入
 			//如果新连接进入，这里执行的应该是CSocekt::ngx_event_accept(c)】            
 			//如果是已经连入，发送数据到这里，则这里执行的应该是 CSocekt::ngx_read_request_handler()                                                      
-
 		}
 
 		if (revents & EPOLLOUT) //如果是写事件【对方关闭连接也触发这个，再研究。。。。。。】，注意上边的 if(revents & (EPOLLERR|EPOLLHUP))  revents |= EPOLLIN|EPOLLOUT; 读写标记都给加上了
@@ -711,14 +740,17 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 
 	char* pMsgBuf;
 	LPSTRUC_MSG_HEADER	pMsgHeader;
-	LPCOMM_PKG_HEADER   pPkgHeader;
+	//gyb
+	//LPCOMM_PKG_HEADER   pPkgHeader;
+	PMSGHEAD   pPkgHeader;
 	lpngx_connection_t  p_Conn;
-	unsigned short      itmp;
+	//unsigned short      itmp;
+	unsigned int      itmp;
 	ssize_t             sendsize;
 
 	CMemory* p_memory = CMemory::GetInstance();
 
-	while (g_stopEvent == 0) //不退出
+	while (g_stopEventChild == 0) //不退出
 	{
 		//如果信号量值>0，则 -1(减1) 并走下去，否则卡这里卡着【为了让信号量值+1，可以在其他线程调用sem_post达到，实际上在CSocekt::msgSend()调用sem_post就达到了让这里sem_wait走下去的目的】
 		//******如果被某个信号中断，sem_wait也可能过早的返回，错误为EINTR；
@@ -731,7 +763,7 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 		}
 
 		//一般走到这里都表示需要处理数据收发了
-		if (g_stopEvent != 0)  //要求整个进程退出
+		if (g_stopEventChild != 0)  //要求整个进程退出
 			break;
 
 		if (pSocketObj->m_iSendMsgQueueCount > 0) //原子的 
@@ -746,11 +778,12 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 			{
 				pMsgBuf = (*pos);                          //拿到的每个消息都是 消息头+包头+包体【但要注意，我们是不发送消息头给客户端的】
 				pMsgHeader = (LPSTRUC_MSG_HEADER)pMsgBuf;  //指向消息头
-				pPkgHeader = (LPCOMM_PKG_HEADER)(pMsgBuf + pSocketObj->m_iLenMsgHeader);	//指向包头
+				//pPkgHeader = (LPCOMM_PKG_HEADER)(pMsgBuf + pSocketObj->m_iLenMsgHeader);	//指向包头
+				pPkgHeader = (PMSGHEAD)(pMsgBuf + pSocketObj->m_iLenMsgHeader);				//指向包头
 				p_Conn = pMsgHeader->pConn;
 
 				//包过期，因为如果 这个连接被回收，比如在ngx_close_connection(),inRecyConnectQueue()中都会自增iCurrsequence
-					 //而且这里有没必要针对 本连接 来用m_connectionMutex临界 ,只要下面条件成立，肯定是客户端连接已断，要发送的数据肯定不需要发送了
+				//而且这里有没必要针对 本连接 来用m_connectionMutex临界 ,只要下面条件成立，肯定是客户端连接已断，要发送的数据肯定不需要发送了
 				if (p_Conn->iCurrsequence != pMsgHeader->iCurrsequence)
 				{
 					//本包中保存的序列号与p_Conn【连接池中连接】中实际的序列号已经不同，丢弃此消息，小心处理该消息的删除
@@ -762,12 +795,16 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 					continue;
 				} //end if
 
+				//mark 这里可以阻止上一个消息没发送完毕，直接发送下一个消息
 				if (p_Conn->iThrowsendCount > 0)
 				{
 					//靠系统驱动来发送消息，所以这里不能再发送
 					pos++;
 					continue;
 				}
+
+				//debug
+				//std::cout << "CSocekt::ServerSendQueueThread()中发送消息，消息为：" << pPkgHeader->id << " : " << pPkgHeader->itemname << std::endl; //调试用
 
 				//走到这里，可以发送消息，一些必须的信息记录，要发送的东西也要从发送队列里干掉
 				p_Conn->psendMemPointer = pMsgBuf;      //发送后释放用的，因为这段内存是new出来的
@@ -776,7 +813,9 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 				pSocketObj->m_MsgSendQueue.erase(pos2);
 				--pSocketObj->m_iSendMsgQueueCount;      //发送消息队列容量少1	
 				p_Conn->psendbuf = (char*)pPkgHeader;   //要发送的数据的缓冲区指针，因为发送数据不一定全部都能发送出去，我们要记录数据发送到了哪里，需要知道下次数据从哪里开始发送
-				itmp = ntohs(pPkgHeader->pkgLen);        //包头+包体 长度 ，打包时用了htons【本机序转网络序】，所以这里为了得到该数值，用了个ntohs【网络序转本机序】；
+				//gyb
+				//itmp = ntohs(pPkgHeader->pkgLen);        //包头+包体 长度 ，打包时用了htons【本机序转网络序】，所以这里为了得到该数值，用了个ntohs【网络序转本机序】；
+				itmp = pPkgHeader->bodysize + sizeof(MSGHEAD);        //包头+包体 长度
 				p_Conn->isendlen = itmp;                 //要发送多少数据，因为发送数据不一定全部都能发送出去，我们需要知道剩余有多少数据还没发送
 
 				//这里是重点，我们采用 epoll水平触发的策略，能走到这里的，都应该是还没有投递 写事件 到epoll中
@@ -786,7 +825,11 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 					//此时，就变成了在epoll驱动下写数据，全部数据发送完毕后，再把写事件通知从epoll中干掉；
 					//优点：数据不多的时候，可以避免epoll的写事件的增加/删除，提高了程序的执行效率；                         
 				//(1)直接调用write或者send发送数据
-				ngx_log_stderr(errno, "即将发送数据%ud。", p_Conn->isendlen);
+				//debug
+				//ngx_log_stderr(errno, "即将发送数据%ud。", p_Conn->isendlen);	//mark 为啥传入errno而不是0
+
+				//debug
+				//auto start = std::chrono::high_resolution_clock::now();
 
 				sendsize = pSocketObj->sendproc(p_Conn, p_Conn->psendbuf, p_Conn->isendlen); //注意参数
 				if (sendsize > 0)
@@ -796,8 +839,9 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 						//成功发送的和要求发送的数据相等，说明全部发送成功了 发送缓冲区去了【数据全部发完】
 						p_memory->FreeMemory(p_Conn->psendMemPointer);  //释放内存
 						p_Conn->psendMemPointer = NULL;
-						p_Conn->iThrowsendCount = 0;  //这行其实可以没有，因此此时此刻这东西就是=0的                        
-						ngx_log_stderr(0, "CSocekt::ServerSendQueueThread()中数据发送完毕，很好。"); //做个提示吧，商用时可以干掉
+						p_Conn->iThrowsendCount = 0;  //这行其实可以没有，因此此时此刻这东西就是=0的
+						//debug
+						//ngx_log_stderr(0, "CSocekt::ServerSendQueueThread()中数据发送完毕，很好。"); //做个提示吧，商用时可以干掉
 					}
 					else  //没有全部发送完毕(EAGAIN)，数据只发出去了一部分，但肯定是因为 发送缓冲区满了,那么
 					{
@@ -821,9 +865,12 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 						ngx_log_stderr(errno, "CSocekt::ServerSendQueueThread()中数据没发送完毕【发送缓冲区满】，整个要发送%d，实际发送了%d。", p_Conn->isendlen, sendsize);
 
 					} //end if(sendsize > 0)
+					//debug
+					//auto end = std::chrono::high_resolution_clock::now();
+					//auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+					//std::cout << "电文发送执行时间: " << duration.count() << " 微秒" << std::endl;
 					continue;  //继续处理其他消息                    
 				}  //end if(sendsize > 0)
-
 				//能走到这里，应该是有点问题的
 				else if (sendsize == 0)
 				{
@@ -865,7 +912,6 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 					p_Conn->iThrowsendCount = 0;  //这行其实可以没有，因此此时此刻这东西就是=0的  
 					continue;
 				}
-
 			} //end while(pos != posend)
 
 			err = pthread_mutex_unlock(&pSocketObj->m_sendMessageQueueMutex);
@@ -875,4 +921,52 @@ void* CSocekt::ServerSendQueueThread(void* threadData)
 	} //end while
 
 	return (void*)0;
+}
+
+//gyb
+void ngx_connection_s::StartTimeoutTimer(int dwMilliseconds)
+{
+	//mark 使用了全局变量
+	m_timerID = g_tm.add_once(dwMilliseconds, [](void* user) {
+		std::cout << "超时时间到" << std::endl;
+
+		lpngx_connection_t pConn = (lpngx_connection_t)user;
+
+		//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程
+		CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
+
+		if (pConn->m_bWaitingTimeout)
+		{
+			pConn->m_bWaitingTimeout = false;
+			pConn->m_bWaitingPost = false;
+
+			CMemory* p_memory = CMemory::GetInstance();
+			char* p_sendbuf = (char*)p_memory->AllocMemory(sizeof(STRUC_MSG_HEADER) + sizeof(PKGHEAD) + 0, false); //分配内存【长度是 消息头长度  + 包头长度 + 包体长度】，最后参数先给false，表示内存不需要memset;
+
+			//a)先填写消息头内容
+			LPSTRUC_MSG_HEADER ptmpMsgHeader = (LPSTRUC_MSG_HEADER)p_sendbuf;
+			ptmpMsgHeader->pConn = pConn;
+			ptmpMsgHeader->iCurrsequence = pConn->iCurrsequence; //收到包时的连接池中连接序号记录到消息头里来，以备将来用；
+			//b)再填写包头内容
+			PPKGHEAD pPkgHead = (PPKGHEAD)(p_sendbuf + sizeof(STRUC_MSG_HEADER));
+			pPkgHead->id = POSTWAIT;
+			pPkgHead->itemname[0] = '\0';
+			pPkgHead->error = ETIMEDOUT;
+			pPkgHead->bodysize = 0;
+			//f)发送数据包
+			g_socket.msgSend(p_sendbuf);
+		}
+		},
+		this);
+}
+
+void ngx_connection_s::StopTimeoutTimer()
+{
+	if (m_timerID < 0)
+	{
+		ngx_log_stderr(0, "StopTimeoutTimer : m_timerID < 0!");
+		return;
+	}
+
+	g_tm.cancel(m_timerID); //删除定时器
 }

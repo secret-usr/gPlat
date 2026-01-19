@@ -292,7 +292,8 @@ void CThreadPool::Call()
 			//两次报告之间的间隔必须超过10秒，不然如果一直出现当前工作线程全忙，但频繁报告日志也够烦的
 			m_iLastEmgTime = currtime;  //更新时间
 			//写日志，通知这种紧急情况给用户，用户要考虑增加线程池中线程数量了
-			ngx_log_stderr(0, "CThreadPool::Call()中发现线程池中当前空闲线程数量为0，要考虑扩容线程池了!");
+			//debug
+			//ngx_log_stderr(0, "CThreadPool::Call()中发现线程池中当前空闲线程数量为0，要考虑扩容线程池了!");
 		}
 	} //end if 
 

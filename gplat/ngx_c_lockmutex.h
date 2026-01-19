@@ -20,7 +20,6 @@ public:
 	}
 private:
 	pthread_mutex_t *m_pMutex;
-    
 };
 
 #endif

@@ -7,13 +7,37 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <time.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <string.h>
+#include <netinet/tcp.h>  //TCP_NODELAY
+
+
 #include "../include/msg.h"
 #include "qbd.h"
 
 namespace fs = std::filesystem;
 
-thread_local  unsigned int errorCode = 0;
-char dataQuePath[100];
+enum EVENTID
+{
+	DEFAULT = 1,
+	POST_DELAY = 2,
+	NOT_EQUAL_ZERO = 4,
+	EQUAL_ZERO = 8,
+};
+
+thread_local char g_buffer[MAXMSGLEN] = { 0 };
+thread_local unsigned int errorCode = 0;
+char dataQuePath[100] = ".//qbdfile//";
 struct TABLE_MSG table[TABLESIZE];
 int tabCounter = 0;
 std::mutex mutex_rw;
@@ -282,6 +306,197 @@ inline int hash2(const char* s)
 	return remain == 0 ? 1 : remain;
 }
 
+int setnonblocking(int fd)
+{
+	int old_option = fcntl(fd, F_GETFL);
+	int new_option = old_option | O_NONBLOCK;
+	fcntl(fd, F_SETFL, new_option);
+	return old_option;
+}
+
+int setblocking(int fd)
+{
+	int old_option = fcntl(fd, F_GETFL);
+	int new_option = old_option & ~O_NONBLOCK;
+	fcntl(fd, F_SETFL, new_option);
+	return old_option;
+}
+
+int unblock_connect(const char* ip, int port, int time)
+{
+	int ret = 0;
+	struct sockaddr_in address;
+	bzero(&address, sizeof(address));
+	address.sin_family = AF_INET;
+	inet_pton(AF_INET, ip, &address.sin_addr);
+	address.sin_port = htons(port);
+
+	int sockfd = socket(PF_INET, SOCK_STREAM, 0);
+	int fdopt = setnonblocking(sockfd);
+
+	//Nagle 算法（发送方缓冲合并小包）
+	//TCP 默认启用 Nagle 算法，它的核心逻辑是：
+	//如果发送方有未确认的小数据（小于 MSS，通常 1460 字节），则会等待：
+	//直到收到前一个包的 ACK，或者
+	//累积到足够大的数据（MSS）再发送。
+
+	//你的情况：两次 send 的小数据可能被 Nagle 算法合并，导致第二个 send 延迟发送。
+	//服务器数据接收延迟现象最可能由 Nagle + Delayed ACK 组合 导致：
+	//客户端第一个send触发Nagle等待ACK。
+	//客户端第二个send因为Delayed ACK的40ms延迟，导致数据晚到。
+	//解决办法：发送方禁用 Nagle（适合低延迟场景）
+	int flag = 1;
+	setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+
+	ret = connect(sockfd, (struct sockaddr*)&address, sizeof(address));
+	if (ret == 0)
+	{
+		printf("connect with server immediately\n");
+		fcntl(sockfd, F_SETFL, fdopt);
+		return sockfd;
+	}
+	else if (errno != EINPROGRESS)
+	{
+		printf("unblock connect not support\n");
+		return -1;
+	}
+
+	fd_set readfds;
+	fd_set writefds;
+	struct timeval timeout;
+
+	FD_ZERO(&readfds);
+	FD_SET(sockfd, &writefds);
+
+	timeout.tv_sec = time;
+	timeout.tv_usec = 0;
+
+	ret = select(sockfd + 1, NULL, &writefds, NULL, &timeout);
+	if (ret <= 0)
+	{
+		printf("connection time out\n");
+		close(sockfd);
+		return -1;
+	}
+
+	if (!FD_ISSET(sockfd, &writefds))
+	{
+		printf("no events on sockfd found\n");
+		close(sockfd);
+		return -1;
+	}
+
+	int error = 0;
+	socklen_t length = sizeof(error);
+	if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &error, &length) < 0)
+	{
+		printf("get socket option failed\n");
+		close(sockfd);
+		return -1;
+	}
+
+	if (error != 0)
+	{
+		printf("connection failed after select with the error: %d \n", error);
+		close(sockfd);
+		return -1;
+	}
+
+	printf("connection ready after select with the socket: %d \n", sockfd);
+	fcntl(sockfd, F_SETFL, fdopt);
+	return sockfd;
+}
+
+int send_all(int sockfd, const void* buf, size_t len) {
+	size_t total_sent = 0;
+	while (total_sent < len) {
+		//mark send会像下面的readn一样被信号中断吗
+		int sent = send(sockfd, (char*)buf + total_sent, len - total_sent, 0);
+		if (sent <= 0) return sent; // 错误或连接关闭
+		total_sent += sent;
+	}
+	return total_sent;
+}
+
+/**
+ * 阻塞读取指定字节数的数据
+ * @param sockfd 套接字描述符
+ * @param buf 接收缓冲区
+ * @param len 需要读取的字节数
+ * @return 成功返回实际读取的字节数(等于len)，失败返回-1
+ */
+ssize_t readn(int sockfd, void* buf, size_t len) {
+	size_t nleft = len;    // 剩余需要读取的字节数
+	ssize_t nread;         // 每次读取的字节数
+	char* ptr = (char*)buf;  // 当前读取位置
+
+	while (nleft > 0) {
+		nread = read(sockfd, ptr, nleft);
+
+		if (nread < 0) {
+			if (errno == EINTR) {  // 被信号中断
+				nread = 0;         // 重新调用read
+			}
+			else {
+				return -1;         // 其他错误
+			}
+		}
+		else if (nread == 0) {   // EOF，对端关闭连接
+			break;                  // 返回已读取的字节数(小于len)
+		}
+
+		nleft -= nread;
+		ptr += nread;
+	}
+
+	return (len - nleft);  // 返回实际读取的字节数
+}
+
+//变体版本（带超时控制）
+ssize_t readn_timeout(int sockfd, void* buf, size_t len, int timeout_sec) {
+	fd_set readfds;
+	struct timeval tv;
+	size_t nleft = len;
+	ssize_t nread;
+	char* ptr = (char*)buf;
+
+	while (nleft > 0) {
+		FD_ZERO(&readfds);
+		FD_SET(sockfd, &readfds);
+		tv.tv_sec = timeout_sec;
+		tv.tv_usec = 0;
+
+		int ret = select(sockfd + 1, &readfds, NULL, NULL, &tv);
+		if (ret == -1) {
+			if (errno == EINTR) continue;
+			return -1;
+		}
+		else if (ret == 0) {
+			errno = ETIMEDOUT;
+			return -1;
+		}
+
+		nread = read(sockfd, ptr, nleft);
+		// 其余处理与普通版本相同...
+		if (nread < 0) {
+			if (errno == EINTR) {  // 被信号中断
+				nread = 0;         // 重新调用read
+			}
+			else {
+				return -1;         // 其他错误
+			}
+		}
+		else if (nread == 0) {   // EOF，对端关闭连接
+			break;                  // 返回已读取的字节数(小于len)
+		}
+
+		nleft -= nread;
+		ptr += nread;
+	}
+
+	return (len - nleft);
+}
+
 /*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
 Function: IsEmptyQ
 
@@ -294,6 +509,705 @@ F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
 extern "C" unsigned int GetLastErrorQ()
 {
 	return errorCode;
+}
+
+extern "C" int connectgplat(const char* server, int port)
+{
+	// 参数校验
+	if (!server || port <= 0 || port > 65535) {
+		fprintf(stderr, "[ERROR] Invalid server address or port number\n");
+		return -1;
+	}
+
+	// 建立非阻塞连接
+	int sockfd = unblock_connect(server, port, 2);  // 2秒超时
+	if (sockfd < 0) {
+		fprintf(stderr, "[ERROR] Connection to %s:%d failed: %s\n",
+			server, port, strerror(errno));
+		return -1;
+	}
+
+	// 设置为阻塞模式
+	if (!setblocking(sockfd)) {
+		fprintf(stderr, "[WARNING] Failed to set blocking mode for socket %d\n", sockfd);
+		// 继续使用，非致命错误
+	}
+
+	printf("[INFO] Connected to gplat server %s:%d (fd=%d)\n", server, port, sockfd);
+	return sockfd;
+}
+
+extern "C" bool readq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error)
+{
+	// 参数校验
+	if (!qname || !record || !error || actsize <= 0) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = READQ;
+	msg.head.datasize = actsize;
+	msg.head.bodysize = 0;
+
+	// 安全拷贝队列名
+	strncpy(msg.head.qname, qname, sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	// 发送请求
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取响应头
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 检查错误码
+	*error = msg.head.error;
+	if (*error != 0) {
+		return false;
+	}
+
+	// 验证数据大小
+	if (msg.head.bodysize > actsize) {
+		*error = ERROR_BUFFER_TOO_SMALL;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取数据体（如果有）
+	if (msg.head.bodysize > 0) {
+		if (readn(sockfd, record, msg.head.bodysize) < 0) {
+			*error = errno;
+			close(sockfd);
+			return false;
+		}
+	}
+
+	return true;
+}
+
+extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error)
+{
+	// 参数校验
+	if (!qname || !record || !error || actsize <= 0) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	if (actsize > MAXMSGLEN) {
+		*error = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = WRITEQ;
+	msg.head.datasize = actsize;
+	msg.head.bodysize = actsize;
+
+	// 安全拷贝队列名
+	strncpy(msg.head.qname, qname, sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	// 发送消息头和数据
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0 ||
+		send_all(sockfd, record, actsize) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取响应
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 验证响应
+	if (msg.head.bodysize > 0) {
+		*error = ERROR_INVALID_RESPONSE;
+		close(sockfd);
+		return false;
+	}
+
+	*error = msg.head.error;
+	return (*error == 0);
+}
+
+bool clearq(int sockfd, const char* qname, unsigned int* error)
+{
+	// 参数校验
+	if (!qname || !error) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = CLEARQ;
+	msg.head.bodysize = 0;
+
+	// 安全拷贝队列名
+	strncpy(msg.head.qname, qname, sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	// 发送请求
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取响应头
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 检查错误码
+	*error = msg.head.error;
+	if (*error != 0) {
+		return false;
+	}
+
+	return true;
+}
+
+extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error, timespec* timestamp)
+{
+	// 参数校验
+	if (!tagname || !value || !error || actsize <= 0) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = READB;
+	msg.head.datasize = actsize;
+	msg.head.bodysize = 0;
+
+	// 安全拷贝字符串
+	strncpy(msg.head.qname, "BOARD", sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+
+	// 发送请求
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取响应头
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 检查错误码
+	*error = msg.head.error;
+	if (*error != 0) {
+		return false;
+	}
+
+	// 验证数据大小
+	if (msg.head.bodysize > actsize) {
+		*error = ERROR_BUFFER_TOO_SMALL;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取数据体（如果有）
+	if (msg.head.bodysize > 0) {
+		if (readn(sockfd, value, msg.head.bodysize) < 0) {
+			*error = errno;
+			close(sockfd);
+			return false;
+		}
+	}
+
+	// 返回时间戳（如果请求）
+	if (timestamp) {
+		*timestamp = msg.head.timestamp;
+	}
+
+	return true;
+}
+
+extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error)
+{
+	// 参数校验
+	if (!tagname || !value || !error || actsize <= 0) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	if (actsize > MAXMSGLEN) {
+		*error = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = WRITEB;
+	msg.head.datasize = actsize;
+	msg.head.bodysize = actsize;
+	msg.head.offset = 0;
+	msg.head.subsize = 0;
+
+	// 安全拷贝字符串
+	strncpy(msg.head.qname, "BOARD", sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+
+	//禁用Nagle算法（适合低延迟场景）后，则执行效率相同
+	//memcpy(msg.body, value, actsize);
+	//send_all(sockfd, &msg, sizeof(MSGHEAD) + actsize);
+	// 发送消息头和数据（单次发送优化）
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0 ||
+		send_all(sockfd, value, actsize) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 接收响应
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 验证响应
+	if (msg.head.bodysize > 0) {
+		*error = ERROR_INVALID_RESPONSE;
+		close(sockfd);
+		return false;
+	}
+
+	*error = msg.head.error;
+	return (*error == 0);
+}
+
+extern "C" bool readb_string(int sockfd, const char* tagname, char* value, int buffersize, unsigned int* error, timespec* timestamp)
+{
+	// 参数校验
+	if (!tagname || !value || !error || buffersize <= 0) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = READBSTRING;
+	msg.head.datasize = buffersize;
+	msg.head.bodysize = 0;
+
+	// 安全拷贝字符串
+	strncpy(msg.head.qname, "BOARD", sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+
+	// 发送请求
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取响应头
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 检查错误码
+	*error = msg.head.error;
+	if (*error != 0) {
+		return false;
+	}
+
+	// 验证数据大小
+	// 目前这种情况不可能出现，因为服务器会确保数据体大小不超过buffersize，如果buffsize不够大，上面错误码不为零就会返回，不会走到这里
+	if (msg.head.bodysize > buffersize) {
+		*error = ERROR_BUFFER_TOO_SMALL;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取数据体（如果有）
+	if (msg.head.bodysize > 0) {
+		if (readn(sockfd, value, msg.head.bodysize) < 0) {
+			*error = errno;
+			close(sockfd);
+			return false;
+		}
+	}
+
+	// 确保字符串以 null 结尾
+	if (msg.head.bodysize < buffersize) {
+		value[msg.head.bodysize] = '\0';  // 确保 null 结尾
+	} else {
+		value[buffersize - 1] = '\0';  // 防止溢出
+	}
+
+	// 返回时间戳（如果请求）
+	if (timestamp) {
+		*timestamp = msg.head.timestamp;
+	}
+
+	return true;
+}
+
+extern "C" bool readb_string2(int sockfd, const char* tagname, std::string& value, unsigned int* error, timespec* timestamp = 0)
+{
+	//if (readb_string(sockfd, tagname, g_buffer, MAXMSGLEN, error, timestamp)) {
+	//	// 确保字符串以 null 结尾
+	//	g_buffer[MAXMSGLEN - 1] = '\0';
+	//	value.assign(g_buffer);  // 使用 std::string 的 assign 方法
+	//	return true;
+	//}
+
+	// 参数校验
+	if (!tagname || !error) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = READBSTRING;
+	msg.head.datasize = MAXMSGLEN;
+	msg.head.bodysize = 0;
+
+	// 安全拷贝字符串
+	strncpy(msg.head.qname, "BOARD", sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+
+	// 发送请求
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取响应头
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 检查错误码
+	*error = msg.head.error;
+	if (*error != 0) {
+		return false;
+	}
+
+	// 验证数据大小
+	// 目前这种情况不可能出现，因为服务器会确保数据体大小不超过buffersize，如果buffsize不够大，上面错误码不为零就会返回，不会走到这里
+	if (msg.head.bodysize > MAXMSGLEN) {
+		*error = ERROR_BUFFER_TOO_SMALL;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取数据体（如果有）
+	if (msg.head.bodysize > 0) {
+		if (readn(sockfd, g_buffer, msg.head.bodysize) < 0) {
+			*error = errno;
+			close(sockfd);
+			return false;
+		}
+	}
+
+	// 确保字符串以 null 结尾
+	if (msg.head.bodysize < MAXMSGLEN) {
+		g_buffer[msg.head.bodysize] = '\0';  // 确保 null 结尾
+	}
+	else {
+		g_buffer[MAXMSGLEN - 1] = '\0';  // 防止溢出
+	}
+
+	// 返回时间戳（如果请求）
+	if (timestamp) {
+		*timestamp = msg.head.timestamp;
+	}
+
+	value.assign(g_buffer, msg.head.bodysize);  // 使用 std::string 的 assign 方法
+	return true;
+}
+
+extern "C" bool writeb_string(int sockfd, const char* tagname, const char* value, unsigned int* error)
+{
+	int strlength = strlen((const char*)value);
+
+	// 参数校验
+	if (!tagname || !value || !error) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	if (strlength > MAXMSGLEN) {
+		*error = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+	
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = WRITEBSTRING;
+	msg.head.datasize = strlength;
+	msg.head.bodysize = strlength;
+	msg.head.offset = 0;
+	msg.head.subsize = 0;
+
+	// 安全拷贝字符串
+	strncpy(msg.head.qname, "BOARD", sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0 ||
+		send_all(sockfd, value, strlength) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 接收响应
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 验证响应
+	if (msg.head.bodysize > 0) {
+		*error = ERROR_INVALID_RESPONSE;
+		close(sockfd);
+		return false;
+	}
+
+	*error = msg.head.error;
+	return (*error == 0);
+}
+
+extern "C" bool writeb_string2(int sockfd, const char* tagname, std::string& value, unsigned int* error)
+{
+	// 确保字符串以 null 结尾
+	if (value.length() >= MAXMSGLEN) {
+		*error = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+	// mark
+	// 直接传递 c_str()，因为 writeb_string 已经处理了字符串长度和 null 结尾问题
+	// 但是这样会损失效率，因为没有利用std::string的length()方法，length()方法比strlen()更快，因为它不需要遍历字符串
+	return writeb_string(sockfd, tagname, value.c_str(), error);
+}
+
+extern "C" bool subscribe(int sockfd, const char* tagname, unsigned int* error)
+{
+	// 参数校验
+	if (!tagname || !error) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	// 初始化消息结构体
+	MSGSTRUCT msg{};
+	msg.head.id = SUBSCRIBE;
+	msg.head.eventid = EVENTID::DEFAULT;
+	msg.head.eventarg = 0;
+	msg.head.bodysize = 0;
+
+	// 安全拷贝字符串（防止缓冲区溢出）
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+
+	strncpy(msg.head.qname, tagname, sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	// 发送请求
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取响应
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 验证响应
+	if (msg.head.bodysize > 0) {
+		*error = ERROR_INVALID_RESPONSE;
+		close(sockfd);
+		return false;
+	}
+
+	*error = msg.head.error;
+	return (*error == 0);
+}
+
+extern "C" bool subscribedelaypost(int sockfd, const char* tagname, const char* eventname, int delaytime, unsigned int* error)
+{
+	// 参数校验
+	if (!tagname || !eventname || !error) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	// 初始化消息结构体
+	MSGSTRUCT msg{};
+	msg.head.id = SUBSCRIBE;
+	msg.head.eventid = EVENTID::POST_DELAY;
+	msg.head.eventarg = delaytime;
+	msg.head.bodysize = 0;
+
+	// 安全拷贝字符串（防止缓冲区溢出）
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+
+	strncpy(msg.head.qname, eventname, sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	// 发送请求
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取响应
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 验证响应
+	if (msg.head.bodysize > 0) {
+		*error = ERROR_INVALID_RESPONSE;
+		close(sockfd);
+		return false;
+	}
+
+	*error = msg.head.error;
+	return (*error == 0);
+}
+
+extern "C" bool createtag(int sockfd, const char* tagname, int tagsize, void* type, int typesize, unsigned int* error)
+{
+	// 参数校验
+	if (!tagname || !type || !error) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	if (typesize > 100) {  // 类型数据大小限制
+		*error = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+
+	// 初始化消息结构体
+	MSGSTRUCT msg{};
+	msg.head.id = CREATEITEM;
+	msg.head.recsize = tagsize;
+	msg.head.bodysize = typesize;
+
+	// 安全拷贝字符串（防止缓冲区溢出）
+	strncpy(msg.head.qname, "BOARD", sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+
+	// 发送消息头
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 发送类型数据
+	if (send_all(sockfd, type, typesize) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取响应
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 验证响应
+	if (msg.head.bodysize > 0) {
+		*error = ERROR_INVALID_RESPONSE;
+		close(sockfd);
+		return false;
+	}
+
+	*error = msg.head.error;
+	return (*error == 0);
+}
+
+extern "C" bool waitpostdata(int sockfd, std::string& tagname, int timeout, unsigned int* error)
+{
+	//绝对不能在本地实现超时，否则容易出现问题
+	MSGSTRUCT msg{};
+	msg.head.id = POSTWAIT;
+	msg.head.timeout = timeout;  // 或 htonl(timeout)
+	msg.head.bodysize = 0;
+
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	*error = msg.head.error;  // 或 ntohl(msg.head.error)
+	if (*error != 0) {
+		tagname = (*error == ETIMEDOUT) ? "WAIT_TIMEOUT" : "";
+		return (*error == ETIMEDOUT);  // 仅超时返回 true
+	}
+
+	tagname = msg.head.itemname ? msg.head.itemname : "";
+	return true;
 }
 
 /*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
@@ -349,28 +1263,13 @@ extern "C" bool CreateQ(const char* lpFileName,
 		}
 	}
 
-	// 创建文件
-	try {
-		// 创建父目录（如果不存在）
-		fs::path path(dqFileName);
-		if (path.has_parent_path() && !fs::exists(path.parent_path())) {
-			fs::create_directories(path.parent_path());
-		}
-
-		// 创建文件
-		std::ofstream newfile(dqFileName);
-		if (newfile.is_open()) {
-			newfile.close();
-		}
-		else {
+	// 创建父目录（如果不存在）
+	fs::path path(dqFileName);
+	if (path.has_parent_path() && !fs::exists(path.parent_path())) {
+		if (!fs::create_directories(path.parent_path())) {
 			errorCode = ERROR_FILE_CREATE_FAILSURE;
 			return false;
 		}
-	}
-	catch (const std::exception& e) {
-		std::cerr << "create file error: " << e.what() << std::endl;
-		errorCode = ERROR_FILE_CREATE_FAILSURE;
-		return false;
 	}
 
 	// 计算文件大小
@@ -392,7 +1291,7 @@ extern "C" bool CreateQ(const char* lpFileName,
 	}
 
 	// 3. 内存映射文件
-	void* lpMapAddress = mmap(nullptr, fileSize, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+	void* lpMapAddress = mmap(nullptr, fileSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (lpMapAddress == MAP_FAILED) {
 		std::cerr << "内存映射失败: " << strerror(errno) << std::endl;
 		close(fd);
@@ -491,7 +1390,7 @@ extern "C" bool LoadQ(const char* lpDqName)
 	off_t file_size = sb.st_size;
 
 	// 3. 创建内存映射
-	void* lpMapAddress = mmap(nullptr, file_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+	void* lpMapAddress = mmap(nullptr, file_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (lpMapAddress == MAP_FAILED) {
 		std::cerr << "内存映射失败: " << strerror(errno) << std::endl;
 		close(fd);
@@ -1336,28 +2235,13 @@ extern "C" bool CreateB(const char* lpFileName, int size)
 		}
 	}
 
-	// 创建文件
-	try {
-		// 创建父目录（如果不存在）
-		fs::path path(dqFileName);
-		if (path.has_parent_path() && !fs::exists(path.parent_path())) {
-			fs::create_directories(path.parent_path());
-		}
-
-		// 创建文件
-		std::ofstream newfile(dqFileName);
-		if (newfile.is_open()) {
-			newfile.close();
-		}
-		else {
+	// 创建父目录（如果不存在）
+	fs::path path(dqFileName);
+	if (path.has_parent_path() && !fs::exists(path.parent_path())) {
+		if (!fs::create_directories(path.parent_path())) {
 			errorCode = ERROR_FILE_CREATE_FAILSURE;
 			return false;
 		}
-	}
-	catch (const std::exception& e) {
-		std::cerr << "create file error: " << e.what() << std::endl;
-		errorCode = ERROR_FILE_CREATE_FAILSURE;
-		return false;
 	}
 
 	// 计算文件大小
@@ -1380,7 +2264,7 @@ extern "C" bool CreateB(const char* lpFileName, int size)
 	}
 
 	// 3. 内存映射文件
-	void* lpMapAddress = mmap(nullptr, fileSize, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+	void* lpMapAddress = mmap(nullptr, fileSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (lpMapAddress == MAP_FAILED) {
 		std::cerr << "内存映射失败: " << strerror(errno) << std::endl;
 		close(fd);
@@ -1566,6 +2450,37 @@ extern "C" bool ReadB(const char* lpBulletinName, const char* lpItemName, void* 
 	return true;
 }
 
+extern "C" int GetStringLength(const char* lpBulletinName, const char* lpItemName)
+{
+	// Search bulletin in hash table.
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpBulletinName, tabmsg))
+	{
+		return -1;
+	}
+
+	BOARD_HEAD* pHead = static_cast<BOARD_HEAD*>(tabmsg.lpMapAddress);
+	BOARD_INDEX_STRUCT* pIndex = pHead->index;
+
+	// search item in bulletin's index(hash table)
+	int loc, c;
+	loc = hash1(lpItemName);
+	c = hash2(lpItemName);
+	tabmsg.pmutex_rw->lock();
+	while (pIndex[loc].itemname[0] != '\0' && strcmp(pIndex[loc].itemname, lpItemName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+	if (!strcmp(pIndex[loc].itemname, "\0") || pIndex[loc].erased)
+	{
+		// item not found
+		tabmsg.pmutex_rw->unlock();
+		return -1;
+	}
+	tabmsg.pmutex_rw->unlock();
+	return pIndex[loc].strlenth; // 返回实际字符串长度，不包括'\0'结尾
+}
+
 extern "C" bool ReadB_String(const char* lpBulletinName, const char* lpItemName, void* lpItem, int actSize, timespec* timestamp)
 {
 	// Search bulletin in hash table.
@@ -1605,7 +2520,9 @@ extern "C" bool ReadB_String(const char* lpBulletinName, const char* lpItemName,
 	}
 
 	// validate item size
-	if (pIndex[loc].itemsize > actSize)
+	//if (pIndex[loc].itemsize > actSize)
+	//改为验证实际字符串长度是否超过缓冲区大小
+	if (pIndex[loc].strlenth > actSize)
 	{
 		errorCode = BUFFER_TOO_SMALL;
 		tabmsg.pmutex_rw->unlock();
@@ -1617,13 +2534,85 @@ extern "C" bool ReadB_String(const char* lpBulletinName, const char* lpItemName,
 	std::lock_guard<std::mutex> lock(pHead->mutex_rw_tag[loc & (MUTEXSIZE - 1)]);
 
 	//ZeroMemory(lpItem, actSize);
+	//mark 确保返回的字符串是以'\0'结尾的，但当缓冲区长度刚好等于实际字符串长度的时候，不能保证'\0'结尾
 	memset(lpItem, 0, actSize);
-	memcpy(lpItem, (char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, pIndex[loc].itemsize);
+	//memcpy(lpItem, (char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, pIndex[loc].itemsize);
+	//mark 改为拷贝实际长度
+	memcpy(lpItem, (char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, pIndex[loc].strlenth);
 	if (timestamp != 0)
 	{
 		*timestamp = pIndex[loc].timestamp;
 	}
 
+	return true;
+}
+
+//返回字符串的实际长度，不包括'\0'结尾	
+extern "C" bool ReadB_String2(const char* lpBulletinName, const char* lpItemName, void* lpItem, int actSize, int& strLength, timespec* timestamp)
+{
+	// Search bulletin in hash table.
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpBulletinName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	BOARD_HEAD* pHead;
+	BOARD_INDEX_STRUCT* pIndex;
+	pHead = (BOARD_HEAD*)lpMapAddress;
+	pIndex = pHead->index;
+
+	// search item in bulletin's index(hash table)
+	int loc, c;
+	loc = hash1(lpItemName);
+	c = hash2(lpItemName);
+
+	//std::lock_guard<std::mutex> lock(*tabmsg.pmutex_rw);
+	tabmsg.pmutex_rw->lock();
+
+	while (strcmp(pIndex[loc].itemname, "\0") && strcmp(pIndex[loc].itemname, lpItemName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (!strcmp(pIndex[loc].itemname, "\0") || pIndex[loc].erased)
+	{
+		// item not found
+		errorCode = ERROR_RECORD_NOT_EXIST;
+		tabmsg.pmutex_rw->unlock();
+		return false;
+	}
+
+	// validate item size
+	//if (pIndex[loc].itemsize > actSize)
+	//改为验证实际字符串长度是否超过缓冲区大小
+	if (pIndex[loc].strlenth > actSize)
+	{
+		errorCode = BUFFER_TOO_SMALL;
+		tabmsg.pmutex_rw->unlock();
+		return false;
+	}
+
+	tabmsg.pmutex_rw->unlock();
+
+	std::lock_guard<std::mutex> lock(pHead->mutex_rw_tag[loc & (MUTEXSIZE - 1)]);
+
+	//ZeroMemory(lpItem, actSize);
+	//mark 确保返回的字符串是以'\0'结尾的，但当缓冲区长度刚好等于实际字符串长度的时候，不能保证'\0'结尾
+	//注释是因为返回了实际长度，不需要'\0'结尾，由调用方决定是否添加'\0'结尾
+	//memset(lpItem, 0, actSize);
+	//memcpy(lpItem, (char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, pIndex[loc].itemsize);
+	//mark 改为拷贝实际长度
+	memcpy(lpItem, (char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, pIndex[loc].strlenth);
+	if (timestamp != 0)
+	{
+		*timestamp = pIndex[loc].timestamp;
+	}
+
+	strLength = pIndex[loc].strlenth; // 返回实际字符串长度，不包括'\0'结尾	
 	return true;
 }
 
@@ -1813,7 +2802,10 @@ extern "C" bool WriteB_String(const char* lpBulletinName, const char* lpItemName
 			errorCode = STRING_TOO_LONG;
 			return false;
 		}
+
+		pIndex[loc].strlenth = actSize;	//mark 记录字符串长度，便于读取时判断是否足够
 		//ZeroMemory((char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, pIndex[loc].itemsize);
+		//mark 下面的置零操作现在有些多余，因为字段strlenth已经记录了当前字符串的长度，但为了安全，还是保留了
 		memset((char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, 0, pIndex[loc].itemsize);
 		memcpy((char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, lpItem, actSize);
 		//_time64(&pIndex[loc].timestamp);
@@ -2649,3 +3641,116 @@ extern "C" bool ClearDB(const char* lpDbName)
 	return true;
 }
 
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: CreateItem
+
+Summary:  Create item in Board.
+
+Args:     LPCTSTR lpDBName
+database name
+LPCTSTR lpItemName
+item name to be writen
+VOID  *lpItem
+item buffer pointer
+int actSize
+item size
+int offset
+item offset
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool CreateItem(const char* lpBoardName, const char* lpItemName, int itemSize, void* pType, int typeSize)
+{
+	//目前看是不可能，因为只传入一个C++类型名
+	if (typeSize > TYPEMAXSIZE)
+	{
+		errorCode = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+
+	// Search bulletin in hash table.
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpBoardName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	pthread_mutex_t hMutex;
+	lpMapAddress = tabmsg.lpMapAddress;
+	hMutex = tabmsg.hMutex;
+	BOARD_HEAD* pHead;
+	BOARD_INDEX_STRUCT* pIndex;
+	pHead = (BOARD_HEAD*)lpMapAddress;
+	pIndex = pHead->index;
+
+	//WaitForSingleObject(hMutex, INFINITE);
+	std::unique_lock<std::mutex> lock(*tabmsg.pmutex_rw);
+
+	//search table in board index(hash table)
+	int loc, c, loc_s, c_s;
+	loc = hash1(lpItemName);
+	c = hash2(lpItemName);
+	loc_s = loc, c_s = c;
+	while (strcmp(pIndex[loc].itemname, "\0") && strcmp(pIndex[loc].itemname, lpItemName))
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (strcmp(pIndex[loc].itemname, lpItemName) == 0 && pIndex[loc].erased == false)
+	{
+		errorCode = ERROR_ITEM_ALREADY_EXIST;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	// no enough remained space
+	if (pHead->remain < itemSize)
+	{
+		errorCode = ERROR_NO_SPACE;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	loc = loc_s;
+	c = c_s;
+	while (strcmp(pIndex[loc].itemname, "\0") && !pIndex[loc].erased)
+	{
+		loc = (loc + c) % INDEXSIZE;
+	}
+
+	if (pHead->indexcount == INDEXSIZE - 1)
+	{
+		errorCode = ERROR_ITEM_OVERFLOW;
+		//ReleaseMutex(hMutex);
+		return false;
+	}
+
+	pHead->indexcount++;
+	strcpy(pIndex[loc].itemname, lpItemName);
+	pIndex[loc].itemsize = itemSize;
+	pIndex[loc].startpos = pHead->nextpos;
+	pIndex[loc].erased = false;
+	pHead->nextpos += itemSize;
+	pHead->remain -= itemSize;
+	//_time64(&pIndex[loc].timestamp);
+	clock_gettime(CLOCK_REALTIME, &pIndex[loc].timestamp);
+	//mark
+	if (pType != 0 && typeSize != 0 && typeSize < TYPEMAXSIZE && typeSize < pHead->typeremain)
+	{
+		//mark
+		memcpy((char*)lpMapAddress + pHead->totalsize + pHead->nexttypepos,
+			pType,
+			typeSize
+		);
+		pIndex[loc].typesize = typeSize;
+		pIndex[loc].typeaddr = pHead->nexttypepos;
+		pHead->nexttypepos += typeSize;
+		pHead->typeremain -= typeSize;
+	}
+	else
+	{
+		pIndex[loc].typesize = 0;
+	}
+	//ReleaseMutex(hMutex);
+	return true;
+}

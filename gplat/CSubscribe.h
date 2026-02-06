@@ -31,7 +31,7 @@ public:
     CSubscribe() {};  
     ~CSubscribe() {};  
 
-    // Ôö¼Ó¶©ÔÄÕß  
+    // ?  
     void Attach(std::string tagname, EventNode observer)
     {  
         std::unique_lock<std::shared_mutex> lock(mutex_rw);  

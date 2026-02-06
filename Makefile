@@ -42,7 +42,7 @@ GPLAT_DIR := gplat
 GPLAT_SRCS := $(wildcard $(GPLAT_DIR)/*.cxx)
 GPLAT_OBJS := $(patsubst $(GPLAT_DIR)/%.cxx, $(BUILD_DIR)/$(GPLAT_DIR)/%.o, $(GPLAT_SRCS))
 GPLAT_BIN := $(BIN_DIR)/gplat
-GPLAT_LDLIBS := -lpthread
+GPLAT_LDLIBS := -lpthread -L$(LIB_DIR) -lhigplat -Wl,-rpath,'$$ORIGIN/../lib'
 
 # --- Module: higplat (Shared Library) ---
 HIGPLAT_DIR := higplat
@@ -86,9 +86,9 @@ directories:
 	@mkdir -p $(BIN_DIR) $(LIB_DIR)
 
 # --- Rules for gplat ---
-$(GPLAT_BIN): $(GPLAT_OBJS)
+$(GPLAT_BIN): $(GPLAT_OBJS) $(HIGPLAT_LIB)
 	@echo "Linking $@"
-	@$(CXX) $(LDFLAGS) $^ $(GPLAT_LDLIBS) -o $@
+	@$(CXX) $(LDFLAGS) $(GPLAT_OBJS) $(GPLAT_LDLIBS) -o $@
 
 $(BUILD_DIR)/$(GPLAT_DIR)/%.o: $(GPLAT_DIR)/%.cxx
 	@mkdir -p $(@D)

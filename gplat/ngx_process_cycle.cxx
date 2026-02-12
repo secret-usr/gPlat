@@ -1,9 +1,5 @@
 ﻿//和开启子进程相关
-/*
-公众号：程序员速成     q群：716480601
-王健伟老师 《Linux C++通讯架构实战》
-商业级质量的代码，完整的项目，帮你提薪至少10K
-*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -99,9 +95,6 @@ void ngx_master_process_cycle()
 
 		sigsuspend(&set); //阻塞在这里，等待一个信号，此时进程是挂起的，不占用cpu时间，只有收到信号才会被唤醒（返回）；
 		//此时master进程完全靠信号驱动干活    
-
-		//mark 为何要休息
-		//sleep(1); //休息1秒 
 		
 		//子进程退出了，发送SIGCHLD信号给父进程，父进程信号处理函数将g_stopEventMain置1，父进程也要退出
 		if (g_stopEventMain == 1)
@@ -110,7 +103,7 @@ void ngx_master_process_cycle()
 			break;
 		}
 
-	}// end for(;;)
+	}
 	return;
 }
 
@@ -122,7 +115,7 @@ static void ngx_start_worker_processes(int threadnums)
 	for (i = 0; i < threadnums; i++)  //master进程在走这个循环，来创建若干个子进程
 	{
 		ngx_spawn_process(i, "worker process");
-	} //end for
+	}
 	return;
 }
 
@@ -152,19 +145,18 @@ static int ngx_spawn_process(int inum, const char* pprocname)
 
 	default: //这个应该是父进程分支，直接break;，流程往switch之后走            
 		break;
-	}//end switch
+	}
 
-	//父进程分支会走到这里，子进程流程不往下边走-------------------------
-	//若有需要，以后再扩展增加其他代码......
+	//父进程分支会走到这里，子进程流程不往下边走
+	//若有需要，以后再扩展增加其他代码
 	return pid;
 }
 
 //描述：worker子进程的功能函数，每个woker子进程，就在这里循环着了（无限循环【处理网络事件和定时器事件以对外提供web服务】）
-//     子进程分叉才会走到这里
+//子进程分叉才会走到这里
 //inum：进程编号【0开始】
 static void ngx_worker_process_cycle(int inum, const char* pprocname)
 {
-	//gyb
 	close(sockpair[1]);  // 关闭不需要的一端
 
 	//设置一下变量
@@ -187,7 +179,7 @@ static void ngx_worker_process_cycle(int inum, const char* pprocname)
 			break;
 		}
 
-	} //end for(;;)
+	}
 
 	//如果从这个循环跳出来
 	g_threadpool.StopAll();      //考虑在这里停止线程池；
@@ -215,7 +207,7 @@ static void ngx_worker_process_init(int inum)
 		//内存没释放，但是简单粗暴退出；
 		exit(-2);
 	}
-	sleep(1); //再休息1秒；
+	sleep(1);
 
 	//启动定时器的线程，率先创建，至少要比和socket相关的内容优先
 	try
@@ -253,7 +245,7 @@ static void ngx_worker_process_init(int inum)
 
 		//启动5秒定时器
 		g_tm.add_periodic(5000, [](void* user) {
-			std::cout << "-------------5秒定时器时间到" << std::endl;
+			std::cout << "-5秒定时器时间到" << std::endl;
 			g_socket.NotifyTimerSubscriber("timer_5s"); //通知定时器到达了
 			},
 			nullptr);
@@ -271,10 +263,7 @@ static void ngx_worker_process_init(int inum)
 
 	//如下这些代码参照官方nginx里的ngx_event_process_init()函数中的代码
 	g_socket.ngx_epoll_init();           //初始化epoll相关内容，同时 往监听socket上增加监听事件，从而开始让监听端口履行其职责
-	//g_socket.ngx_epoll_listenportstart();//往监听socket上增加监听事件，从而开始让监听端口履行其职责【如果不加这行，虽然端口能连上，但不会触发ngx_epoll_process_events()里边的epoll_wait()往下走】
-
 
 	//....将来再扩充代码
-	//....
 	return;
 }

@@ -1,5 +1,4 @@
-﻿
-#ifndef __NGX_THREADPOOL_H__
+﻿#ifndef __NGX_THREADPOOL_H__
 #define __NGX_THREADPOOL_H__
 
 #include <vector>
@@ -52,8 +51,8 @@ private:
     //int                        m_iRunningThreadNum; //线程数, 运行中的线程数	
     std::atomic<int>           m_iRunningThreadNum; //线程数, 运行中的线程数，原子操作
     time_t                     m_iLastEmgTime;      //上次发生线程不够用【紧急事件】的时间,防止日志报的太频繁
-    //time_t                     m_iPrintInfoTime;    //打印信息的一个间隔时间，我准备10秒打印出一些信息供参考和调试
-    //time_t                     m_iCurrTime;         //当前时间
+    //time_t                     m_iPrintInfoTime;  //打印信息的一个间隔时间，我准备10秒打印出一些信息供参考和调试
+    //time_t                     m_iCurrTime;       //当前时间
 
     std::vector<ThreadItem *>  m_threadVector;      //线程 容器，容器里就是各个线程了 
 

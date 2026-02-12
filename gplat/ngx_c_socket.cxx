@@ -1,10 +1,6 @@
 ﻿
-//和网络 有关的函数放这里
-/*
-公众号：程序员速成     q群：716480601
-王健伟老师 《Linux C++通讯架构实战》
-商业级质量的代码，完整的项目，帮你提薪至少10K
-*/
+//和网络有关的函数
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,10 +23,9 @@
 #include "ngx_c_lockmutex.h"
 #include <iostream>
 
-//gyb 控制子进程退出的信号量
+//控制子进程退出的信号量
 extern int sockpair[2]; //socketpair的文件描述符，父进程和子进程之间的通信管道
 
-//--------------------------------------------------------------------------
 //构造函数
 CSocekt::CSocekt()
 {

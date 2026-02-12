@@ -1,7 +1,7 @@
 ﻿#ifndef __NGX_C_CRC32_H__
 #define __NGX_C_CRC32_H__
 
-#include <stddef.h>  //NULL
+#include <stddef.h>
 
 class CCRC32
 {
@@ -39,7 +39,7 @@ public:
 			}
 		}
 	};
-	//-------
+
 public:
 
 	void  Init_CRC32_Table();

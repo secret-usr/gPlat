@@ -1,9 +1,5 @@
-﻿//和日志相关的函数放之类
-/*
-公众号：程序员速成     q群：716480601
-王健伟老师 《Linux C++通讯架构实战》
-商业级质量的代码，完整的项目，帮你提薪至少10K
-*/
+﻿//和日志相关的函数
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,36 +32,17 @@ static u_char err_levels[][20] =
 };
 ngx_log_t   ngx_log;
 
-
-//----------------------------------------------------------------------------------------------------------------------
-//描述：通过可变参数组合出字符串【支持...省略号形参】，自动往字符串最末尾增加换行符【所以调用者不用加\n】， 往标准错误上输出这个字符串；
-//     如果err不为0，表示有错误，会将该错误编号以及对应的错误信息一并放到组合出的字符串中一起显示；
-
-//《c++从入门到精通》里老师讲解过，比较典型的C语言中的写法，就是这种va_start,va_end
-//fmt:通过这第一个普通参数来寻址后续的所有可变参数的类型及其值
-//调用格式比如：ngx_log_stderr(0, "invalid option: \"%s\",%d", "testinfo",123);
- /*
-	ngx_log_stderr(0, "invalid option: \"%s\"", argv[0]);  //nginx: invalid option: "./nginx"
-	ngx_log_stderr(0, "invalid option: %10d", 21);         //nginx: invalid option:         21  ---21前面有8个空格
-	ngx_log_stderr(0, "invalid option: %.6f", 21.378);     //nginx: invalid option: 21.378000   ---%.这种只跟f配合有效，往末尾填充0
-	ngx_log_stderr(0, "invalid option: %.6f", 12.999);     //nginx: invalid option: 12.999000
-	ngx_log_stderr(0, "invalid option: %.2f", 12.999);     //nginx: invalid option: 13.00
-	ngx_log_stderr(0, "invalid option: %xd", 1678);        //nginx: invalid option: 68E
-	ngx_log_stderr(0, "invalid option: %Xd", 1678);        //nginx: invalid option: 68E
-	ngx_log_stderr(15, "invalid option: %s , %d", "testInfo",326);        //nginx: invalid option: testInfo , 326
-	ngx_log_stderr(0, "invalid option: %d", 1678);
-	*/
 void ngx_log_stderr(int err, const char* fmt, ...)
 {
-	va_list args;                        //创建一个va_list类型变量
-	u_char  errstr[NGX_MAX_ERROR_STR + 1]; //2048  -- ************  +1是我自己填的，感谢官方写法有点小瑕疵，所以动手调整一下
+	va_list args;							//创建一个va_list类型变量
+	u_char  errstr[NGX_MAX_ERROR_STR + 1];	//2048  -- ************  +1是我自己填的，感谢官方写法有点小瑕疵，所以动手调整一下
 	u_char* p, * last;
 
-	memset(errstr, 0, sizeof(errstr));     //我个人加的，这块有必要加，至少在va_end处理之前有必要，否则字符串没有结束标记不行的；***************************
+	memset(errstr, 0, sizeof(errstr));		//我个人加的，这块有必要加，至少在va_end处理之前有必要，否则字符串没有结束标记不行的；***************************
 
 	last = errstr + NGX_MAX_ERROR_STR;        //last指向整个buffer最后去了【指向最后一个有效位置的后面也就是非有效位】，作为一个标记，防止输出内容超过这么长,
 	//其实我认为这有问题，所以我才在上边errstr[NGX_MAX_ERROR_STR+1]; 给加了1
-//比如你定义 char tmp[2]; 你如果last = tmp+2，那么last实际指向了tmp[2]，而tmp[2]在使用中是无效的
+	//比如你定义 char tmp[2]; 你如果last = tmp+2，那么last实际指向了tmp[2]，而tmp[2]在使用中是无效的
 
 	p = ngx_cpymem(errstr, "nginx: ", 7);     //p指向"nginx: "之后    
 
@@ -94,7 +71,7 @@ void ngx_log_stderr(int err, const char* fmt, ...)
 	{
 		//因为上边已经把err信息显示出来了，所以这里就不要显示了，否则显示重复了
 		err = 0;    //不要再次把错误信息弄到字符串里，否则字符串里重复了
-		p--;*p = 0; //把原来末尾的\n干掉，因为到ngx_log_err_core中还会加这个\n 
+		p--; *p = 0; //把原来末尾的\n干掉，因为到ngx_log_err_core中还会加这个\n 
 		ngx_log_error_core(NGX_LOG_STDERR, err, (const char*)errstr);
 	}
 	return;
@@ -133,7 +110,7 @@ u_char* ngx_log_errno(u_char* buf, u_char* last, int err)
 
 //----------------------------------------------------------------------------------------------------------------------
 //往日志文件中写日志，代码中有自动加换行符，所以调用时字符串不用刻意加\n；
-//    日过定向为标准错误，则直接往屏幕上写日志【比如日志文件打不开，则会直接定位到标准错误，此时日志就打印到屏幕上，参考ngx_log_init()】
+//日过定向为标准错误，则直接往屏幕上写日志【比如日志文件打不开，则会直接定位到标准错误，此时日志就打印到屏幕上，参考ngx_log_init()】
 //level:一个等级数字，我们把日志分成一些等级，以方便管理、显示、过滤等等，如果这个等级数字比配置文件中的等级数字"LogLevel"大，那么该条信息不被写到日志文件中
 //err：是个错误代码，如果不是0，就应该转换成显示对应的错误信息,一起写到日志文件中，
 //ngx_log_error_core(5,8,"这个XXX工作的有问题,显示的结果是=%s","YYYY");
@@ -222,7 +199,7 @@ void ngx_log_error_core(int level, int err, const char* fmt, ...)
 			}
 		}
 		break;
-	} //end while    
+	}
 	return;
 }
 

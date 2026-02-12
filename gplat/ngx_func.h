@@ -1,6 +1,4 @@
-﻿//函数声明放在这个头文件里-------------------------------------------
-
-#ifndef __NGX_FUNC_H__
+﻿#ifndef __NGX_FUNC_H__
 #define __NGX_FUNC_H__
 
 //字符串相关函数
@@ -25,6 +23,5 @@ int    ngx_init_signals();
 void   ngx_master_process_cycle();
 int    ngx_daemon();
 void   ngx_process_events_and_timers();
-
 
 #endif  

@@ -1,5 +1,4 @@
-﻿
-#ifndef __NGX_GBLDEF_H__
+﻿#ifndef __NGX_GBLDEF_H__
 #define __NGX_GBLDEF_H__
 
 #include <signal.h> 
@@ -26,7 +25,6 @@ typedef struct
 	int    fd;          //日志文件描述符
 
 }ngx_log_t;
-
 
 //外部全局量声明
 extern size_t        g_argvneedmem;

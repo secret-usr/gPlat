@@ -1,9 +1,5 @@
-﻿//和设置课执行程序标题（名称）相关的放这里 
-/*
-公众号：程序员速成     q群：716480601
-王健伟老师 《Linux C++通讯架构实战》
-商业级质量的代码，完整的项目，帮你提薪至少10K
-*/
+﻿//和设置执行程序标题（名称）相关的放这里
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>  //env
@@ -22,9 +18,9 @@ void ngx_init_setproctitle()
 	//把原来的内存内容搬到新地方来
 	for (int i = 0; environ[i]; i++)
 	{
-		size_t size = strlen(environ[i]) + 1; //不要拉下+1，否则内存全乱套了，因为strlen是不包括字符串末尾的\0的
-		strcpy(ptmp, environ[i]);      //把原环境变量内容拷贝到新地方【新内存】
-		environ[i] = ptmp;            //然后还要让新环境变量指向这段新内存
+		size_t size = strlen(environ[i]) + 1;	//不要拉下+1，否则内存全乱套了，因为strlen是不包括字符串末尾的\0的
+		strcpy(ptmp, environ[i]);				//把原环境变量内容拷贝到新地方【新内存】
+		environ[i] = ptmp;						//然后还要让新环境变量指向这段新内存
 		ptmp += size;
 	}
 	return;

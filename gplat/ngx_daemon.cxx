@@ -1,9 +1,5 @@
 ﻿//和守护进程相关
-/*
-公众号：程序员速成     q群：716480601
-王健伟老师 《Linux C++通讯架构实战》
-商业级质量的代码，完整的项目，帮你提薪至少10K
-*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -12,7 +8,6 @@
 #include <errno.h>     //errno
 #include <sys/stat.h>
 #include <fcntl.h>
-
 
 #include "ngx_func.h"
 #include "ngx_macro.h"
@@ -33,7 +28,7 @@ int ngx_daemon()
 		//子进程，走到这里直接break;
 		break;
 	default:
-		//父进程以往 直接退出exit(0);现在希望回到主流程去释放一些资源
+		//父进程以往直接退出exit(0);现在希望回到主流程去释放一些资源
 		return 1;  //父进程直接返回1；
 	} //end switch
 

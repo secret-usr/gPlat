@@ -1,9 +1,5 @@
-﻿//和打印格式相关的函数放这里
-/*
-公众号：程序员速成     q群：716480601
-王健伟老师 《Linux C++通讯架构实战》
-商业级质量的代码，完整的项目，帮你提薪至少10K
-*/
+﻿//和打印格式相关的函数
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,9 +13,8 @@
 //只用于本文件的一些函数声明就放在本文件中
 static u_char* ngx_sprintf_num(u_char* buf, u_char* last, uint64_t ui64, u_char zero, uintptr_t hexadecimal, uintptr_t width);
 
-//----------------------------------------------------------------------------------------------------------------------
-//对于 nginx 自定义的数据结构进行标准格式化输出,就像 printf,vprintf 一样，我们顺道学习写这类函数到底内部是怎么实现的
-//该函数只不过相当于针对ngx_vslprintf()函数包装了一下，所以，直接研究ngx_vslprintf()即可
+//对于nginx自定义的数据结构进行标准格式化输出,就像 printf,vprintf 一样，我们顺道学习写这类函数到底内部是怎么实现的
+//该函数只不过相当于针对ngx_vslprintf()函数包装了一下，所以直接研究ngx_vslprintf()即可
 u_char* ngx_slprintf(u_char* buf, u_char* last, const char* fmt, ...)
 {
 	va_list   args;
@@ -31,7 +26,6 @@ u_char* ngx_slprintf(u_char* buf, u_char* last, const char* fmt, ...)
 	return p;
 }
 
-//----------------------------------------------------------------------------------------------------------------------
 //和上边的ngx_snprintf非常类似
 u_char* ngx_snprintf(u_char* buf, size_t max, const char* fmt, ...)   //类printf()格式化函数，比较安全，max指明了缓冲区结束位置
 {
@@ -44,16 +38,15 @@ u_char* ngx_snprintf(u_char* buf, size_t max, const char* fmt, ...)   //类print
 	return p;
 }
 
-//----------------------------------------------------------------------------------------------------------------------
 //对于 nginx 自定义的数据结构进行标准格式化输出,就像 printf,vprintf 一样，我们顺道学习写这类函数到底内部是怎么实现的
 //例如，给进来一个 "abc = %d",13   ,最终buf里得到的应该是   abc=13 这种结果
 //buf：往这里放数据
 //last：放的数据不要超过这里
 //fmt：以这个为首的一系列可变参数
-//支持的格式： %d【%Xd/%xd】:数字,    %s:字符串      %f：浮点,  %P：pid_t
-	//对于：ngx_log_stderr(0, "invalid option: \"%s\",%d", "testinfo",123);
-	   //fmt = "invalid option: \"%s\",%d"
-	   //args = "testinfo",123
+//支持的格式： %d【%Xd/%xd】:数字  %s:字符串 %f：浮点  %P：pid_t
+//对于：ngx_log_stderr(0, "invalid option: \"%s\",%d", "testinfo",123);
+//fmt = "invalid option: \"%s\",%d"
+//args = "testinfo",123
 u_char* ngx_vslprintf(u_char* buf, u_char* last, const char* fmt, va_list args)
 {
 	//比如说你要调用ngx_log_stderr(0, "invalid option: \"%s\"", argv[i]);，那么这里的fmt就应该是:   invalid option: "%s"
@@ -61,20 +54,13 @@ u_char* ngx_vslprintf(u_char* buf, u_char* last, const char* fmt, va_list args)
 
 	u_char     zero;
 
-	/*
-	#ifdef _WIN64
-		typedef unsigned __int64  uintptr_t;
-	#else
-		typedef unsigned int uintptr_t;
-	#endif
-	*/
 	uintptr_t  width, sign, hex, frac_width, scale, n;  //临时用到的一些变量
 
-	int64_t    i64;   //保存%d对应的可变参
-	uint64_t   ui64;  //保存%ud对应的可变参，临时作为%f可变参的整数部分也是可以的 
-	u_char* p;    //保存%s对应的可变参
-	double     f;     //保存%f对应的可变参
-	uint64_t   frac;  //%f可变参数,根据%.2f等，取得小数部分的2位后的内容；
+	int64_t    i64;		//保存%d对应的可变参
+	uint64_t   ui64;	//保存%ud对应的可变参，临时作为%f可变参的整数部分也是可以的 
+	u_char* p;			//保存%s对应的可变参
+	double     f;		//保存%f对应的可变参
+	uint64_t   frac;	//%f可变参数,根据%.2f等，取得小数部分的2位后的内容；
 
 
 	while (*fmt && buf < last) //每次处理一个字符，处理的是  "invalid option: \"%s\",%d" 中的字符
@@ -86,12 +72,12 @@ u_char* ngx_vslprintf(u_char* buf, u_char* last, const char* fmt, va_list args)
 			zero = (u_char)((*++fmt == '0') ? '0' : ' ');  //判断%后边接的是否是个'0',如果是zero = '0'，否则zero = ' '，一般比如你想显示10位，而实际数字7位，前头填充三个字符，就是这里的zero用于填充
 			//ngx_log_stderr(0, "数字是%010d", 12); 
 
-			width = 0;                                       //格式字符% 后边如果是个数字，这个数字最终会弄到width里边来 ,这东西目前只对数字格式有效，比如%d,%f这种
-			sign = 1;                                       //显示的是否是有符号数，这里给1，表示是有符号数，除非你 用%u，这个u表示无符号数 
-			hex = 0;                                       //是否以16进制形式显示(比如显示一些地址)，0：不是，1：是，并以小写字母显示a-f，2：是，并以大写字母显示A-F
-			frac_width = 0;                                  //小数点后位数字，一般需要和%.10f配合使用，这里10就是frac_width；
-			i64 = 0;                                         //一般用%d对应的可变参中的实际数字，会保存在这里
-			ui64 = 0;                                        //一般用%ud对应的可变参中的实际数字，会保存在这里    
+			width = 0;				//格式字符% 后边如果是个数字，这个数字最终会弄到width里边来 ,这东西目前只对数字格式有效，比如%d,%f这种
+			sign = 1;				//显示的是否是有符号数，这里给1，表示是有符号数，除非你 用%u，这个u表示无符号数 
+			hex = 0;				//是否以16进制形式显示(比如显示一些地址)，0：不是，1：是，并以小写字母显示a-f，2：是，并以大写字母显示A-F
+			frac_width = 0;			//小数点后位数字，一般需要和%.10f配合使用，这里10就是frac_width；
+			i64 = 0;				//一般用%d对应的可变参中的实际数字，会保存在这里
+			ui64 = 0;				//一般用%ud对应的可变参中的实际数字，会保存在这里    
 
 			//-----------------变量初始化工作结束-----------------
 
@@ -128,14 +114,14 @@ u_char* ngx_vslprintf(u_char* buf, u_char* last, const char* fmt, va_list args)
 					while (*fmt >= '0' && *fmt <= '9')  //如果是数字，一直循环，这个循环最终就能把诸如%.10f中的10提取出来
 					{
 						frac_width = frac_width * 10 + (*fmt++ - '0');
-					} //end while(*fmt >= '0' && *fmt <= '9') 
+					}
 					break;
 
 				default:
 					break;
-				} //end switch (*fmt) 
+				}
 				break;
-			} //end for ( ;; )
+			}
 
 			switch (*fmt)
 			{
@@ -165,11 +151,6 @@ u_char* ngx_vslprintf(u_char* buf, u_char* last, const char* fmt, va_list args)
 					ui64 = (uint64_t)va_arg(args, uintptr_t);
 				}
 
-				//if (max_width) 
-				//{
-				//    width = NGX_INT_T_LEN;
-				//}
-
 				break;
 
 			case 'L':  //转换int64j型数据，如果用%uL，则转换的数据类型是uint64 t
@@ -196,7 +177,7 @@ u_char* ngx_vslprintf(u_char* buf, u_char* last, const char* fmt, va_list args)
 
 				while (*p && buf < last)  //没遇到字符串结束标记，并且buf值够装得下这个参数
 				{
-					*buf++ = *p++;  //那就装，比如  "%s"    ，   "abcdefg"，那abcdefg都被装进来
+					*buf++ = *p++;  //那就装，比如 "%s"，"abcdefg"，那abcdefg都被装进来
 				}
 
 				fmt++;
@@ -295,10 +276,9 @@ u_char* ngx_vslprintf(u_char* buf, u_char* last, const char* fmt, va_list args)
 	return buf;
 }
 
-//----------------------------------------------------------------------------------------------------------------------
 //以一个指定的宽度把一个数字显示在buf对应的内存中, 如果实际显示的数字位数 比指定的宽度要小 ,比如指定显示10位，而你实际要显示的只有“1234567”，那结果可能是会显示“   1234567”
-	 //当然如果你不指定宽度【参数width=0】，则按实际宽度显示
-	 //你给进来一个%Xd之类的，还能以十六进制数字格式显示出来
+//当然如果你不指定宽度【参数width=0】，则按实际宽度显示
+//你给进来一个%Xd之类的，还能以十六进制数字格式显示出来
 //buf：往这里放数据
 //last：放的数据不要超过这里
 //ui64：显示的数字         
@@ -346,8 +326,8 @@ static u_char* ngx_sprintf_num(u_char* buf, u_char* last, uint64_t ui64, u_char 
 			*--p = hex[(uint32_t)(ui64 & 0xf)];
 		} while (ui64 >>= 4);    //ui64 >>= 4     --->   ui64 = ui64 >> 4 ,而ui64 >> 4是啥，实际上就是右移4位，就是除以16,因为右移4位就等于移动了1111；
 		//相当于把该16进制数的最末尾一位干掉，原来是 12 D687, >> 4后是 12 D68，如此反复，最终肯定有=0时导致while不成立退出循环
-		 //比如 1234567 / 16 = 77160(0x12D68) 
-		 // 77160 / 16 = 4822(0x12D6)
+		//比如 1234567 / 16 = 77160(0x12D68) 
+		//77160 / 16 = 4822(0x12D6)
 	}
 	else // hexadecimal == 2    //如果显示一个十六进制数字，格式符为：%Xd，则这个条件成立，要以16进制数字形式显示出来这个十进制数,A-F大写
 	{

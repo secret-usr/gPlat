@@ -1,16 +1,10 @@
-﻿//和处理系统配置文件相关的放这里
-/*
-公众号：程序员速成     q群：716480601
-王健伟老师 《Linux C++通讯架构实战》
-商业级质量的代码，完整的项目，帮你提薪至少10K
-*/
-//系统头文件放上边
+﻿//处理系统配置文件相关
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <vector>
 
-//自定义头文件放下边,因为g++中用了-I参数，所以这里用<>也可以
+//自定义头文件,因为g++中用了-I参数，所以这里用<>也可以
 #include "ngx_func.h"     //函数声明
 #include "ngx_c_conf.h"   //和配置文件处理相关的类,名字带c_表示和类有关
 
@@ -45,11 +39,9 @@ bool CConfig::Load(const char* pconfName)
 	//每一行配置文件读出来都放这里
 	char  linebuf[501];   //每行配置都不要太长，保持<500字符内，防止出现问题
 
-	//走到这里，文件打开成功 
 	while (!feof(fp))  //检查文件是否结束 ，没有结束则条件成立
 	{
-		//大家要注意老师的写法，注意写法的严密性，商业代码，就是要首先确保代码的严密性
-		if (fgets(linebuf, 500, fp) == NULL) //从文件中读数据，每次读一行，一行最多不要超过500个字符 
+		if (fgets(linebuf, 500, fp) == NULL) //从文件中读数据，每次读一行，不超过500个字符 
 			continue;
 
 		if (linebuf[0] == 0)
@@ -60,7 +52,7 @@ bool CConfig::Load(const char* pconfName)
 			continue;
 
 	lblprocstring:
-		//屁股后边若有换行，回车，空格等都截取掉
+		//若有换行，回车，空格等都截取掉
 		if (strlen(linebuf) > 0)
 		{
 			if (linebuf[strlen(linebuf) - 1] == 10 || linebuf[strlen(linebuf) - 1] == 13 || linebuf[strlen(linebuf) - 1] == 32)
@@ -78,10 +70,10 @@ bool CConfig::Load(const char* pconfName)
 		char* ptmp = strchr(linebuf, '=');
 		if (ptmp != NULL)
 		{
-			LPCConfItem p_confitem = new CConfItem;                    //注意前边类型带LP，后边new这里的类型不带
+			LPCConfItem p_confitem = new CConfItem;
 			memset(p_confitem, 0, sizeof(CConfItem));
 			strncpy(p_confitem->ItemName, linebuf, (int)(ptmp - linebuf)); //等号左侧的拷贝到p_confitem->ItemName
-			strcpy(p_confitem->ItemContent, ptmp + 1);                    //等号右侧的拷贝到p_confitem->ItemContent
+			strcpy(p_confitem->ItemContent, ptmp + 1);                     //等号右侧的拷贝到p_confitem->ItemContent
 
 			Rtrim(p_confitem->ItemName);
 			Ltrim(p_confitem->ItemName);
@@ -89,15 +81,15 @@ bool CConfig::Load(const char* pconfName)
 			Ltrim(p_confitem->ItemContent);
 
 			//printf("itemname=%s | itemcontent=%s\n",p_confitem->ItemName,p_confitem->ItemContent);            
-			m_ConfigItemList.push_back(p_confitem);  //内存要释放，因为这里是new出来的 
-		} //end if
+			m_ConfigItemList.push_back(p_confitem);
+		}
 	} //end while(!feof(fp)) 
 
-	fclose(fp); //这步不可忘记
+	fclose(fp);
 	return true;
 }
 
-//根据ItemName获取配置信息字符串，不修改不用互斥
+//根据ItemName获取配置信息字符串
 const char* CConfig::GetString(const char* p_itemname)
 {
 	std::vector<LPCConfItem>::iterator pos;
@@ -105,10 +97,11 @@ const char* CConfig::GetString(const char* p_itemname)
 	{
 		if (strcasecmp((*pos)->ItemName, p_itemname) == 0)
 			return (*pos)->ItemContent;
-	}//end for
+	}
 	return NULL;
 }
-//根据ItemName获取数字类型配置信息，不修改不用互斥
+
+//根据ItemName获取数字类型配置信息
 int CConfig::GetIntDefault(const char* p_itemname, const int def)
 {
 	std::vector<LPCConfItem>::iterator pos;
@@ -116,7 +109,7 @@ int CConfig::GetIntDefault(const char* p_itemname, const int def)
 	{
 		if (strcasecmp((*pos)->ItemName, p_itemname) == 0)
 			return atoi((*pos)->ItemContent);
-	}//end for
+	}
 	return def;
 }
 

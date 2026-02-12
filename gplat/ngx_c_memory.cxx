@@ -1,9 +1,6 @@
 ﻿
-//和 内存分配 有关的函数放这里
-/*
-王健伟老师 《Linux C++通讯架构实战》
-商业级质量的代码，完整的项目，帮你提薪至少10K
-*/
+//内存分配有关
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,8 +15,8 @@ CMemory* CMemory::m_instance = NULL;
 //ifmemset：是否要把分配的内存初始化为0；
 void* CMemory::AllocMemory(int memCount, bool ifmemset)
 {
-	void* tmpData = (void*)new char[memCount]; //我并不会判断new是否成功，如果new失败，程序根本不应该继续运行，就让它崩溃以方便我们排错吧
-	if (ifmemset) //要求内存清0
+	void* tmpData = (void*)new char[memCount]; //不判断结果，如果new失败，程序根本不应该继续运行，就让它崩溃以方便排错
+	if (ifmemset)
 	{
 		memset(tmpData, 0, memCount);
 	}
@@ -29,7 +26,6 @@ void* CMemory::AllocMemory(int memCount, bool ifmemset)
 //内存释放函数
 void CMemory::FreeMemory(void* point)
 {
-	//delete [] point;  //这么删除编译会出现警告：warning: deleting ‘void*’ is undefined [-Wdelete-incomplete]
-	delete[]((char*)point); //new的时候是char *，这里弄回char *，以免出警告
+	delete[]((char*)point); //new的时候是char *，这里转换回char *，以免出现编译警告：warning: deleting ‘void*’ is undefined [-Wdelete-incomplete]
 }
 

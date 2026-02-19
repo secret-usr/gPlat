@@ -82,7 +82,6 @@
     <ClInclude Include="higplat.h" />
     <ClInclude Include="msg.h" />
     <ClInclude Include="qbdtype.h" />
-    <ClInclude Include="TimerManager.h" />
     <ClInclude Include="timer_manager.h" />
   </ItemGroup>
   <ItemDefinitionGroup />

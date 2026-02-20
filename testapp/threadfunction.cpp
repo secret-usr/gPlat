@@ -1,4 +1,4 @@
-#include <thread>
+ï»¿#include <thread>
 #include <string>
 #include <cstdio>
 #include <cstdlib>
@@ -10,7 +10,7 @@
 #include "../include/higplat.h"
 #include "../include/qbdtype.h"
 
-extern std::atomic<bool> g_running;  // ¿ØÖÆÏß³ÌÔËĞĞµÄ±êÖ¾
+extern std::atomic<bool> g_running;  // æ§åˆ¶çº¿ç¨‹è¿è¡Œçš„æ ‡å¿—
 
 void threadFunction1() {
     int conngplat;
@@ -18,7 +18,7 @@ void threadFunction1() {
     bool ret{ false };
     unsigned int error;
     subscribe(conngplat, "int1", &error);
-	subscribedelaypost(conngplat, "int1", "int1_delay1000", 1000, &error); // ÑÓÊ±¶©ÔÄ
+	subscribedelaypost(conngplat, "int1", "int1_delay1000", 1000, &error); // å»¶æ—¶è®¢é˜…
     subscribe(conngplat, "string1", &error);
     subscribe(conngplat, "timer_500ms", &error);
     subscribe(conngplat, "timer_1s", &error);
@@ -28,34 +28,34 @@ void threadFunction1() {
 
     int a = 0;
     std::string eventname;
-    while (g_running) {  // ¼ì²éÈ«¾ÖÔËĞĞ±êÖ¾ {
-        waitpostdata(conngplat, eventname, -1, &error); // µÈ´ıÊı¾İµ½´ï
+    while (g_running) {  // æ£€æŸ¥å…¨å±€è¿è¡Œæ ‡å¿— {
+        waitpostdata(conngplat, eventname, -1, &error); // ç­‰å¾…æ•°æ®åˆ°è¾¾
         //if (eventname != "int1") {
             printf("eventname=%s, error=%d\n", eventname.c_str(), error);
         //}
         if (eventname == "int1") {
             int a = 0;
-            ret = readb(conngplat, "int1", &a, sizeof(a), &error); // ½ÓÊÕÊı¾İ
+            ret = readb(conngplat, "int1", &a, sizeof(a), &error); // æ¥æ”¶æ•°æ®
             if(!ret) {
                 printf("readb failed, error=%d\n", error);
 			}
         }
         else if (eventname == "int1_delay") {
-            ret = readb(conngplat, "int1", &a, sizeof(a), &error); // ½ÓÊÕÊı¾İ
+            ret = readb(conngplat, "int1", &a, sizeof(a), &error); // æ¥æ”¶æ•°æ®
             if (!ret) {
                 printf("readb failed, error=%d\n", error);
             }
             printf("readb a=%f error=%d\n", a, error);
         }
         else if (eventname == "int2") {
-            ret = readb(conngplat, "int2", &a, sizeof(a), &error); // ½ÓÊÕÊı¾İ
+            ret = readb(conngplat, "int2", &a, sizeof(a), &error); // æ¥æ”¶æ•°æ®
             if (!ret) {
                 printf("readb failed, error=%d\n", error);
             }
         }
         else if (eventname == "string1") {
             std::string str2;
-            ret = readb_string2(conngplat, "string1", str2, &error); // ½ÓÊÕÊı¾İ
+            ret = readb_string2(conngplat, "string1", str2, &error); // æ¥æ”¶æ•°æ®
             if (ret) {
                 printf("readb_string2 str2=%s error=%d\n", str2.c_str(), error);
             }
@@ -75,9 +75,9 @@ void threadFunction2() {
 
     int a = 0;
     std::string eventname;
-    while (g_running) {  // ¼ì²éÈ«¾ÖÔËĞĞ±êÖ¾ {
+    while (g_running) {  // æ£€æŸ¥å…¨å±€è¿è¡Œæ ‡å¿— {
         a++;
-		ret = writeb(conngplat, "int1", &a, sizeof(a), &error); // ½ÓÊÕÊı¾İ;
+		ret = writeb(conngplat, "int1", &a, sizeof(a), &error); // æ¥æ”¶æ•°æ®;
         if (!ret) {
             printf("writeb failed, error=%d\n", error);
 		}
@@ -98,11 +98,11 @@ void threadFunction3() {
     while (g_running) {
         std::string suffix = std::to_string(a++);
         char str1[200] = "hello world, gyb 77777777777777777777777777777777777777777777777777777777777777777777777777777 loop=";
-        strcat(str1, suffix.c_str()); // ½«Êı×Ö×ª»»Îª×Ö·û´®²¢¸´ÖÆµ½ str1
-        ret = writeb_string(conngplat, "string1", str1, &error); // ·¢ËÍÊı¾İ
+        strcat(str1, suffix.c_str()); // å°†æ•°å­—è½¬æ¢ä¸ºå­—ç¬¦ä¸²å¹¶å¤åˆ¶åˆ° str1
+        ret = writeb_string(conngplat, "string1", str1, &error); // å‘é€æ•°æ®
 
         //char str2[1000] = { 0 };
-        //ret = readb_string(conngplat, "string1", str2, sizeof(str2), &error); // ½ÓÊÕÊı¾İ
+        //ret = readb_string(conngplat, "string1", str2, sizeof(str2), &error); // æ¥æ”¶æ•°æ®
         //if (ret) {
         //    printf("readb_string str2=%s error=%d\n", str2, error);
         //}
@@ -111,7 +111,7 @@ void threadFunction3() {
         //}
 
         std::string str2;
-        ret = readb_string2(conngplat, "string1", str2, &error); // ½ÓÊÕÊı¾İ
+        ret = readb_string2(conngplat, "string1", str2, &error); // æ¥æ”¶æ•°æ®
         //if (ret) {
         //    printf("readb_string2 str2=%s error=%d\n", str2.c_str(), error);
         //}

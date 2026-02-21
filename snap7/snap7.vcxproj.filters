@@ -1,0 +1,107 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="core">
+      <UniqueIdentifier>{87ce438c-e8e1-4d1d-b45f-398919aa14e6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="sys">
+      <UniqueIdentifier>{03d3b329-da2b-4ce2-8d4b-e57c0f298018}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lib">
+      <UniqueIdentifier>{1a6800a4-e71f-486f-bd52-3dd0cea46cfb}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\core\s7_client.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\s7_isotcp.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\s7_micro_client.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\s7_partner.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\s7_peer.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\s7_server.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\s7_text.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\lib\snap7_libmain.cpp">
+      <Filter>lib</Filter>
+    </ClCompile>
+    <ClCompile Include="src\sys\snap_msgsock.cpp">
+      <Filter>sys</Filter>
+    </ClCompile>
+    <ClCompile Include="src\sys\snap_sysutils.cpp">
+      <Filter>sys</Filter>
+    </ClCompile>
+    <ClCompile Include="src\sys\snap_tcpsrvr.cpp">
+      <Filter>sys</Filter>
+    </ClCompile>
+    <ClCompile Include="src\sys\snap_threads.cpp">
+      <Filter>sys</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\core\s7_client.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\s7_firmware.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\s7_isotcp.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\s7_micro_client.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\s7_partner.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\s7_peer.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\s7_server.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\s7_text.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\s7_types.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lib\snap7_libmain.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="src\sys\snap_msgsock.h">
+      <Filter>sys</Filter>
+    </ClInclude>
+    <ClInclude Include="src\sys\snap_platform.h">
+      <Filter>sys</Filter>
+    </ClInclude>
+    <ClInclude Include="src\sys\snap_sysutils.h">
+      <Filter>sys</Filter>
+    </ClInclude>
+    <ClInclude Include="src\sys\snap_tcpsrvr.h">
+      <Filter>sys</Filter>
+    </ClInclude>
+    <ClInclude Include="src\sys\snap_threads.h">
+      <Filter>sys</Filter>
+    </ClInclude>
+    <ClInclude Include="src\sys\unix_threads.h">
+      <Filter>sys</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\lib\snap7.def">
+      <Filter>lib</Filter>
+    </None>
+  </ItemGroup>
+</Project>

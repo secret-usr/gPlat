@@ -35,7 +35,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{9ee769de-fa27-4e23-9d16-51d1c40a9110}</ProjectGuid>
+    <ProjectGuid>{1781DAA0-FCC5-4F16-BF9C-AEBDE30223B0}</ProjectGuid>
     <Keyword>Linux</Keyword>
     <RootNamespace>TestApplication</RootNamespace>
     <MinimumVisualStudioVersion>15.0</MinimumVisualStudioVersion>
@@ -43,7 +43,7 @@
     <ApplicationTypeRevision>1.0</ApplicationTypeRevision>
     <TargetLinuxPlatform>Generic</TargetLinuxPlatform>
     <LinuxProjectType>{D51BCBC9-82E9-4017-911E-C93873C4EA2B}</LinuxProjectType>
-    <ProjectName>testapp</ProjectName>
+    <ProjectName>snap7.demo.cpp</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'" Label="Configuration">
@@ -85,8 +85,11 @@
     <TargetExt />
   </PropertyGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="threadfunction.cpp" />
+    <ClCompile Include="client.cpp" />
+    <ClCompile Include="snap7.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="snap7.h" />
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile />
@@ -94,7 +97,7 @@
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(RemoteRootDir)/$(Platform)/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <SharedLibrarySearchPath>%(SharedLibrarySearchPath)</SharedLibrarySearchPath>
-      <LibraryDependencies>higplat</LibraryDependencies>
+      <LibraryDependencies>higplat;snap7</LibraryDependencies>
       <AdditionalOptions>-Wl,-rpath,/home/gyb/projects/gPlature/bin/x64/Debug</AdditionalOptions>
     </Link>
     <ClCompile>

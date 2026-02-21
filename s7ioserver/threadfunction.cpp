@@ -1,4 +1,4 @@
-#include <thread>
+ï»¿#include <thread>
 #include <string>
 #include <cstdio>
 #include <cstdlib>
@@ -8,7 +8,7 @@
 
 #include "../include/higplat.h"
 
-extern std::atomic<bool> g_running;  // ¿ØÖÆÏß³ÌÔËĞĞµÄ±êÖ¾
+extern std::atomic<bool> g_running;  // æ§åˆ¶çº¿ç¨‹è¿è¡Œçš„æ ‡å¿—
 
 void threadFunction1() {
 

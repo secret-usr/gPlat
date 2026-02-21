@@ -239,11 +239,13 @@ bool CLogicSocket::HandleWriteQ(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	//发送数据包
 	msgSend(p_sendbuf);
 
+	pPkgHead->bodysize = pPkgHead->datasize;	//为了发布订阅的时候能拿到正确的包体长度
+
 	//发布订阅
 	if (ret)
 	{
 		strcpy(pPkgHead->itemname, pPkgHead->qname);	//必须的，因为最终发布事件的时候是用的itemname
-		NotifySubscriber(pPkgHead->itemname);
+		NotifySubscriber(pPkgHead->itemname, (char*)pPkgHead + sizeof(PKGHEAD), pPkgHead->datasize);
 	}
 
 	return true;
@@ -357,10 +359,12 @@ bool CLogicSocket::HandleWriteB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMs
 	//发送数据包
 	msgSend(p_sendbuf);
 
+	pPkgHead->bodysize = pPkgHead->datasize;	//为了发布订阅的时候能拿到正确的包体长度
+
 	//发布订阅
 	if (ret)
 	{
-		NotifySubscriber(pPkgHead->itemname);
+		NotifySubscriber(pPkgHead->itemname, (char*)pPkgHead + sizeof(PKGHEAD), pPkgHead->datasize);
 	}
 
 	return true;
@@ -453,10 +457,12 @@ bool CLogicSocket::HandleWriteBString(lpngx_connection_t pConn, LPSTRUC_MSG_HEAD
 	//发送数据包
 	msgSend(p_sendbuf);
 
+	pPkgHead->bodysize = pPkgHead->datasize;	//为了发布订阅的时候能拿到正确的包体长度
+
 	//发布订阅
 	if (ret)
 	{
-		NotifySubscriber(pPkgHead->itemname);
+		NotifySubscriber(pPkgHead->itemname, (char*)pPkgHead + sizeof(PKGHEAD), pPkgHead->datasize);
 	}
 
 	return true;
@@ -499,7 +505,7 @@ bool CLogicSocket::HandleSubscribe(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER 
 	return true;
 }
 
-bool CLogicSocket::HandlePostWait(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
+bool CLogicSocket::HandlePostWait(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader = 0, unsigned short iBodyLength = 0)
 {
 	if (pPkgHeader == NULL)
 	{
@@ -557,7 +563,7 @@ bool CLogicSocket::HandlePostWait(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER p
 	return true;
 }
 
-void CLogicSocket::NotifySubscriber(std::string tagName)
+void CLogicSocket::NotifySubscriber(std::string tagName, char* pPkgBody, unsigned short iBodyLength)
 {
 	std::list<EventNode> subscribers = m_subscriber.GetSubscriber(tagName);
 
@@ -575,7 +581,7 @@ void CLogicSocket::NotifySubscriber(std::string tagName)
 		for (auto subscriber : subscribers)
 		{
 			CMemory* p_memory = CMemory::GetInstance();
-			char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader, false);//准备发送的格式，这里是消息头+包头
+			char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + iBodyLength, false);//准备发送的格式，这里是消息头+包头+包体
 			//填充消息头
 			LPSTRUC_MSG_HEADER ptmpMsgHeader = (LPSTRUC_MSG_HEADER)p_sendbuf;
 			lpngx_connection_t pConn = (lpngx_connection_t)(subscriber.subscriber);
@@ -586,8 +592,13 @@ void CLogicSocket::NotifySubscriber(std::string tagName)
 			pPkgHead->id = POST;	//发布事件
 			strcpy(pPkgHead->itemname, tagName.c_str());	//必须的，因为最终发布事件的时候是用的itemname
 			pPkgHead->error = 0;	//必须设置为0，因为包头是在堆上分配的，所以error值是随机的（而且很有可能是上一次分配的同一块内存的值）
-			pPkgHead->bodysize = 0;	//防御性编程，只发布事件，不发布数据，现在不是防御性的了，因为包头是在堆上分配的，所以bodysize值是随机的，必须设置为0
-
+			pPkgHead->bodysize = iBodyLength;
+			//填充包体
+			if (pPkgBody != NULL && iBodyLength > 0) //如果有包体，才拷贝包体
+			{
+				memcpy(p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader, pPkgBody, iBodyLength);         //包体直接拷贝到这里来
+			}
+			
 			//mark 有必要互斥吗？写入发送队列m_MsgSendQueue的时候已经互斥了，这里又不是真正的发送线程
 			CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
 
@@ -646,7 +657,7 @@ void CLogicSocket::NotifySubscriber(std::string tagName)
 	}
 }
 
-void CLogicSocket::NotifyTimerSubscriber(std::string timerName)
+void CLogicSocket::NotifyTimerSubscriber(std::string timerName, char* pPkgBody, unsigned short iBodyLength)
 {
 	const auto& subscribers = m_subscriber.GetSubscriber(timerName);
 	if (subscribers.empty()) {
@@ -667,7 +678,12 @@ void CLogicSocket::NotifyTimerSubscriber(std::string timerName)
 		pPkgHead->id = POST;	//发布事件
 		strncpy(pPkgHead->itemname, timerName.c_str(), sizeof(pPkgHead->itemname) - 1);
 		pPkgHead->itemname[sizeof(pPkgHead->itemname) - 1] = '\0';  // 确保字符串零终止
-		pPkgHead->bodysize = 0;	//防御性编程，只发布事件，不发布数据
+		pPkgHead->bodysize = iBodyLength;
+		//填充包体
+		if (pPkgBody != NULL && iBodyLength > 0) //如果有包体，才拷贝包体
+		{
+			memcpy(p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader, pPkgBody, iBodyLength);         //包体直接拷贝到这里来
+		}
 
 		CLock lock(&pConn->logicPorcMutex); //凡是和本用户有关的访问都互斥
 

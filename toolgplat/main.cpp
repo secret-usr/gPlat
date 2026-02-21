@@ -218,8 +218,8 @@ bool CreateItem(const std::string& itemName, const std::string& para, const std:
             int typesize = 8 + split[0].length() + 1; //类型代码，数组大小，类型名，0结束符
 
             // 检查大小限制
-            if (itemsize > 128000) {
-                std::cout << "TAG的大小超过了128000，无法创建" << std::endl;
+            if (itemsize > 16000) {
+                std::cout << "TAG的大小超过了16000，无法创建" << std::endl;
                 return false;
             }
 
@@ -249,8 +249,8 @@ bool CreateItem(const std::string& itemName, const std::string& para, const std:
             int typesize = 8 + split[0].length() + 1; //类型代码，数组大小，类型名，0结束符
 
             // 检查大小限制
-            if (itemsize > 128000) {
-                std::cout << "TAG的大小超过了128000，无法创建" << std::endl;
+            if (itemsize > 16000) {
+                std::cout << "TAG的大小超过了16000，无法创建" << std::endl;
                 return false;
             }
 
@@ -321,8 +321,8 @@ bool CreateItem(const std::string& itemName, const std::string& para, const std:
         }
 
         // 检查大小限制
-        if (itemsize > 128000) {
-            std::cout << "TAG的大小超过了128000，无法创建" << std::endl;
+        if (itemsize > 16000) {
+            std::cout << "TAG的大小超过了16000，无法创建" << std::endl;
             return false;
         }
 
@@ -399,8 +399,8 @@ bool CreateItem(const std::string& itemName, const std::string& para, const std:
         }
 
         // 检查大小限制
-        if (itemsize > 128000) {
-            std::cout << "TAG的大小超过了128000，无法创建" << std::endl;
+        if (itemsize > 16000) {
+            std::cout << "TAG的大小超过了16000，无法创建" << std::endl;
             return false;
         }
 

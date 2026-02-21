@@ -1180,7 +1180,7 @@ extern "C" bool createtag(int sockfd, const char* tagname, int tagsize, void* ty
 	return (*error == 0);
 }
 
-extern "C" bool waitpostdata(int sockfd, std::string& tagname, int timeout, unsigned int* error)
+extern "C" bool waitpostdata(int sockfd, std::string& tagname, void* value, int buffersize, int timeout, unsigned int* error)
 {
 	//绝对不能在本地实现超时，否则容易出现问题
 	MSGSTRUCT msg{};
@@ -1198,6 +1198,30 @@ extern "C" bool waitpostdata(int sockfd, std::string& tagname, int timeout, unsi
 		*error = errno;
 		close(sockfd);
 		return false;
+	}
+
+	// 验证数据大小
+	if (msg.head.bodysize > buffersize) {
+		*error = ERROR_BUFFER_TOO_SMALL;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取数据体（如果有）
+	if (msg.head.bodysize > 0) {
+		if (readn(sockfd, value, msg.head.bodysize) < 0) {
+			*error = errno;
+			close(sockfd);
+			return false;
+		}
+	}
+
+	// 确保字符串以 null 结尾
+	if (msg.head.bodysize < buffersize) {
+		((char*)value)[msg.head.bodysize] = '\0';  // 确保 null 结尾
+	}
+	else {
+		((char*)value)[buffersize - 1] = '\0';  // 防止溢出
 	}
 
 	*error = msg.head.error;  // 或 ntohl(msg.head.error)

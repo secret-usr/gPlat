@@ -1,8 +1,8 @@
 #if !defined(HIGPLAT_H_INCLUDED_)
 #define HIGPLAT_H_INCLUDED_
 
-#include <chrono>
 #include <mutex>
+#include <string>
 
 #define DllImport   __declspec( dllimport )
 
@@ -157,7 +157,7 @@ extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize
 extern "C" bool subscribe(int sockfd, const char* tagname, unsigned int* error);
 extern "C" bool subscribedelaypost(int sockfd, const char* tagname, const char* eventname, int delaytime, unsigned int* error);
 extern "C" bool createtag(int sockfd, const char* tagname, int tagsize, void* type, int typesize, unsigned int* error);
-extern "C" bool waitpostdata(int sockfd, std::string& tagname, int timeout, unsigned int* error);
+extern "C" bool waitpostdata(int sockfd, std::string& tagname, void* value, int buffersize, int timeout, unsigned int* error);
 extern "C" bool readb_string(int sockfd, const char* tagname, char* value, int buffersize, unsigned int* error, timespec*timestamp=0);
 extern "C" bool writeb_string(int sockfd, const char* tagname, const char* value, unsigned int* error);
 extern "C" bool readb_string2(int sockfd, const char* tagname, std::string& value, unsigned int* error, timespec* timestamp = 0);

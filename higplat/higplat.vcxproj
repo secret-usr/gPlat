@@ -65,7 +65,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <UseDebugLibraries>true</UseDebugLibraries>
     <ConfigurationType>DynamicLibrary</ConfigurationType>
-    <RemoteRootDir>~/projects</RemoteRootDir>
+    <RemoteRootDir>~/projects/gPlat</RemoteRootDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <UseDebugLibraries>false</UseDebugLibraries>

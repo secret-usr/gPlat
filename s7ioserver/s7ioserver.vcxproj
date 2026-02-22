@@ -92,7 +92,7 @@
     <ClCompile />
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(RemoteRootDir)/$(Platform)/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <SharedLibrarySearchPath>%(SharedLibrarySearchPath)</SharedLibrarySearchPath>
       <LibraryDependencies>higplat</LibraryDependencies>
       <AdditionalOptions>-Wl,-rpath,/home/gyb/projects/gPlature/bin/x64/Debug</AdditionalOptions>

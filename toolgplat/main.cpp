@@ -1,4 +1,9 @@
-﻿#include <readline/readline.h>
+﻿#include <cstdio>  
+//This must come first!
+//这是readline库头文件的问题。这个问题在CentOS/RedHat系统上比较常见，主要原因是C++编译器对C代码的兼容性问题。
+//如果没有#include <cstdio>，readline库中的某些函数声明可能会因为缺少C标准库的头文件而导致编译错误。
+//通过先包含<cstdio>，可以确保C标准库的函数声明被正确引入，从而解决编译问题。
+#include <readline/readline.h>
 #include <readline/history.h>
 #include <iostream>
 #include <string>

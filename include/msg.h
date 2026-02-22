@@ -1,9 +1,9 @@
-#ifndef MSG_H_
+ï»¿#ifndef MSG_H_
 #define MSG_H_
 
 #define MAXMSGLEN 16384
 
-//±ØÐëºÍngx_c_slogic.cxxÖÐstatusHandler[]µÄÏÂ±ê¶ÔÓ¦ÉÏ
+//å¿…é¡»å’Œngx_c_slogic.cxxä¸­statusHandler[]çš„ä¸‹æ ‡å¯¹åº”ä¸Š
 enum MSGID
 {
 	SUCCEED=5,
@@ -40,16 +40,19 @@ enum MSGID
 	READHEADB,
 	READHEADDB,
 	ACK,
-	POPARECORDQ,	//mark
-	WRITEBSTRING,	//mark
-	WRITETOL1,		//mark
-	SUBSCRIBE,		//mark
-	CANCELSUBSCRIBE,//mark
-	POST,			//mark
-	POSTWAIT,		//mark
-	PASSTOSERVER,	//mark ÄÚ²¿Ê¹ÓÃ
-	CLEARB,			//mark
-	CLEARDB			//mark
+	POPARECORDQ,		//mark
+	WRITEBSTRING,		//mark
+	WRITETOL1,			//mark
+	SUBSCRIBE,			//mark
+	CANCELSUBSCRIBE,	//mark
+	POST,				//mark
+	POSTWAIT,			//mark
+	PASSTOSERVER,		//mark å†…éƒ¨ä½¿ç”¨
+	CLEARB,				//mark
+	CLEARDB,			//mark
+	REGISTERPLCSERVER,	//mark
+	WRITEBPLC,			//mark
+	WRITEBSTRINGPLC,	//mark
 };
 
 #pragma pack( push, enter_MSG_H_, 1)

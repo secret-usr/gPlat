@@ -3778,3 +3778,195 @@ extern "C" bool CreateItem(const char* lpBoardName, const char* lpItemName, int 
 	//ReleaseMutex(hMutex);
 	return true;
 }
+
+bool writeb_plc(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error)
+{
+	// 参数校验
+	if (!tagname || !value || !error || actsize <= 0) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	if (actsize > MAXMSGLEN) {
+		*error = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = WRITEPLC;
+	msg.head.datasize = actsize;
+	msg.head.bodysize = actsize;
+	msg.head.offset = 0;
+	msg.head.subsize = 0;
+
+	// 安全拷贝字符串
+	strncpy(msg.head.qname, "BOARD", sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+
+	//禁用Nagle算法（适合低延迟场景）后，则执行效率相同
+	//memcpy(msg.body, value, actsize);
+	//send_all(sockfd, &msg, sizeof(MSGHEAD) + actsize);
+	// 发送消息头和数据（单次发送优化）
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0 ||
+		send_all(sockfd, value, actsize) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 接收响应
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 验证响应
+	if (msg.head.bodysize > 0) {
+		*error = ERROR_INVALID_RESPONSE;
+		close(sockfd);
+		return false;
+	}
+
+	*error = msg.head.error;
+	return (*error == 0);
+}
+
+bool writeb_string_plc(int sockfd, const char* tagname, const char* value, unsigned int* error)
+{
+	int strlength = strlen((const char*)value);
+
+	// 参数校验
+	if (!tagname || !value || !error) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	if (strlength > MAXMSGLEN) {
+		*error = ERROR_PARAMETER_SIZE;
+		return false;
+	}
+	
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = WRITEBSTRINGPLC;
+	msg.head.datasize = strlength;
+	msg.head.bodysize = strlength;
+	msg.head.offset = 0;
+	msg.head.subsize = 0;
+
+	// 安全拷贝字符串
+	strncpy(msg.head.qname, "BOARD", sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0 ||
+		send_all(sockfd, value, strlength) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 接收响应
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 验证响应
+	if (msg.head.bodysize > 0) {
+		*error = ERROR_INVALID_RESPONSE;
+		close(sockfd);
+		return false;
+	}
+
+	*error = msg.head.error;
+	return (*error == 0);
+}
+
+extern "C" bool registerplcserver(int sockfd, const char* tagname, unsigned int* error)
+{
+	// 参数校验
+	if (!tagname || !error) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	// 初始化消息结构体
+	MSGSTRUCT msg{};
+	msg.head.id = REGISTERPLCSERVER;
+	msg.head.bodysize = 0;
+
+	// 安全拷贝字符串（防止缓冲区溢出）
+	strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+	msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+
+	strncpy(msg.head.qname, tagname, sizeof(msg.head.qname) - 1);
+	msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+
+	// 发送请求
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取响应
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 验证响应
+	if (msg.head.bodysize > 0) {
+		*error = ERROR_INVALID_RESPONSE;
+		close(sockfd);
+		return false;
+	}
+
+	*error = msg.head.error;
+	return (*error == 0);
+}
+
+extern "C" bool write_plc_string(int sockfd, const char* tagname, std::string& str, unsigned int* error)
+{
+	return writeb_string_plc(sockfd, tagname, str.c_str(), error);
+}
+
+extern "C" bool write_plc_bool(int sockfd, const char* tagname, bool value, unsigned int* error)
+{
+	return writeb_plc(sockfd, tagname, (void*)&value, sizeof(value), error);
+}
+
+extern "C" bool write_plc_short(int sockfd, const char* tagname, short value, unsigned int* error)
+{
+	return writeb_plc(sockfd, tagname, (void*)&value, sizeof(value), error);
+}
+
+extern "C" bool write_plc_ushort(int sockfd, const char* tagname, unsigned short value, unsigned int* error)
+{
+	return writeb_plc(sockfd, tagname, (void*)&value, sizeof(value), error);
+}
+
+extern "C" bool write_plc_int(int sockfd, const char* tagname, int value, unsigned int* error)
+{
+	return writeb_plc(sockfd, tagname, (void*)&value, sizeof(value), error);
+}
+
+extern "C" bool write_plc_uint(int sockfd, const char* tagname, unsigned int value, unsigned int* error)
+{
+	return writeb_plc(sockfd, tagname, (void*)&value, sizeof(value), error);
+}
+
+extern "C" bool write_plc_float(int sockfd, const char* tagname, float value, unsigned int* error)
+{
+	return writeb_plc(sockfd, tagname, (void*)&value, sizeof(value), error);
+}

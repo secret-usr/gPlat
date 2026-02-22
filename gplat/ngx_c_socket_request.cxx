@@ -35,7 +35,7 @@ void CSocekt::ngx_read_request_handler(lpngx_connection_t pConn)
 		
 		CLock lock(&pConn->logicPorcMutex);
 
-		CancelSubscribe(pConn, pConn->GetTagList());
+		CancelSubscribe(pConn, pConn->GetTagList(), pConn->GetPlcTagList());
 	
 		if (pConn->m_bWaitingTimeout)
 		{

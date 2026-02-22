@@ -95,9 +95,15 @@ struct ngx_connection_s
 		return m_listTag;
 	}
 
+	const std::list<std::string>& GetPlcTagList()
+	{
+		return m_listPlcTag;
+	}
+
 	const void ClearTagList()
 	{
 		m_listTag.clear();
+		m_listPlcTag.clear();
 	}
 
 	void Attach(std::string tagname)
@@ -105,11 +111,17 @@ struct ngx_connection_s
 		m_listTag.push_back(tagname);
 	}
 
+	void AttachPlcTag(std::string tagname)
+	{
+		m_listPlcTag.push_back(tagname);
+	}
+
 	void StartTimeoutTimer(int dwMilliseconds);
 	void StopTimeoutTimer();
 
-	std::list<std::string> m_listTag;	// 订阅的TAG列表
-	std::list<char*> m_listPost;		// 待发送的事件列表
+	std::list<std::string> m_listTag;		// 订阅的TAG列表
+	std::list<std::string> m_listPlcTag;	// 订阅的PLC TAG列表
+	std::list<char*> m_listPost;			// 待发送的事件列表
 
 private:
 	int m_timerID{ -1 };	// 定时器ID
@@ -142,7 +154,7 @@ public:
 
 	int ngx_epoll_oper_event(int fd, uint32_t eventtype, uint32_t flag, int bcaction, lpngx_connection_t pConn);
 
-	virtual void CancelSubscribe(lpngx_connection_t pConn, const std::list<std::string>& tagList) {};
+	virtual void CancelSubscribe(lpngx_connection_t pConn, const std::list<std::string>& tagList, const std::list<std::string>& plcTagList) {};
 
 	//gyb 没办法，超时后要用CLogicSocket全局对象调用此方法发送数据，所以这里要公开	
 	void msgSend(char* psendbuf);											//把数据扔到待发送对列中 
@@ -169,7 +181,7 @@ private:
 	//获取对端信息相关                                              
 	size_t ngx_sock_ntop(struct sockaddr* sa, int port, u_char* text, size_t len);  //根据参数1给定的信息，获取地址端口字符串，返回这个字符串的长度
 
-	//连接池 或 连接 相关
+	//连接池或连接相关
 	void initconnection();												//初始化连接池
 	void clearconnection();												//回收连接池
 	lpngx_connection_t ngx_get_connection(int isock);					//从连接池中获取一个空闲连接

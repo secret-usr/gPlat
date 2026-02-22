@@ -1,4 +1,4 @@
-#if !defined(HIGPLAT_H_INCLUDED_)
+ï»¿#if !defined(HIGPLAT_H_INCLUDED_)
 #define HIGPLAT_H_INCLUDED_
 
 #include <mutex>
@@ -50,23 +50,23 @@
 
 #define MAXDQNAMELENTH 40
 
-#define INDEXSIZE     7177 	// ±ØĞëÎªÖÊÊı£¬±ØĞëºÍdq.hÖĞµÄ¶¨ÒåÒ»ÖÂ
+#define INDEXSIZE     7177 	// å¿…é¡»ä¸ºè´¨æ•°ï¼Œå¿…é¡»å’Œdq.hä¸­çš„å®šä¹‰ä¸€è‡´
 
-#define MUTEXSIZE	  64	// Ò»¸öBOARD»òDBÖĞ¶ÁĞ´ËøµÄÊıÁ¿£¬±ØĞëÊÇ2µÄn´ÎÃİ£¬±ØĞëºÍdq.hÖĞµÄ¶¨ÒåÒ»ÖÂ
+#define MUTEXSIZE	  64	// ä¸€ä¸ªBOARDæˆ–DBä¸­è¯»å†™é”çš„æ•°é‡ï¼Œå¿…é¡»æ˜¯2çš„næ¬¡å¹‚ï¼Œå¿…é¡»å’Œdq.hä¸­çš„å®šä¹‰ä¸€è‡´
 
 #pragma pack( push, enter_dataqueue_h_, 8)
 
 struct QUEUE_HEAD
 {
 	int  qbdtype;
-	int  dataType;			// Êı¾İ¶ÓÁĞµÄÀàĞÍ£¬1ÎªASCIIĞÍ£»0ÎªBINARYĞÍ
-	int  operateMode;		// 1ÎªÒÆÎ»¶ÓÁĞ£¬²»ÅĞ¶ÏÒç³ö£»0ÎªÍ¨ÓÃ¶ÓÁĞ
-	int  num;				// ¼ÇÂ¼Êı
-	int  size;				// ¼ÇÂ¼´óĞ¡
-	int  readPoint;			// ¶ÁÖ¸Õë
-	int  writePoint;		// Ğ´Ö¸Õë
-	char createDate[20];	// ´´½¨ÈÕÆÚ
-	int  typesize;			// ÀàĞÍĞòÁĞ»¯³¤¶È
+	int  dataType;			// æ•°æ®é˜Ÿåˆ—çš„ç±»å‹ï¼Œ1ä¸ºASCIIå‹ï¼›0ä¸ºBINARYå‹
+	int  operateMode;		// 1ä¸ºç§»ä½é˜Ÿåˆ—ï¼Œä¸åˆ¤æ–­æº¢å‡ºï¼›0ä¸ºé€šç”¨é˜Ÿåˆ—
+	int  num;				// è®°å½•æ•°
+	int  size;				// è®°å½•å¤§å°
+	int  readPoint;			// è¯»æŒ‡é’ˆ
+	int  writePoint;		// å†™æŒ‡é’ˆ
+	char createDate[20];	// åˆ›å»ºæ—¥æœŸ
+	int  typesize;			// ç±»å‹åºåˆ—åŒ–é•¿åº¦
 	int  reserved;
 };
 
@@ -74,35 +74,35 @@ struct RECORD_HEAD
 {
 	char createDate[20];
 	char remoteIp[16];
-	int  ack;				// È·ÈÏ±êÖ¾ 0Î´È·ÈÏ1ÒÑÈ·ÈÏ
-	int  index;				// Î»ÖÃË÷Òı£¨0¿ªÊ¼£©
-	int  reserve;			// Ô¤Áô
+	int  ack;				// ç¡®è®¤æ ‡å¿— 0æœªç¡®è®¤1å·²ç¡®è®¤
+	int  index;				// ä½ç½®ç´¢å¼•ï¼ˆ0å¼€å§‹ï¼‰
+	int  reserve;			// é¢„ç•™
 };
 
 //clock_gettime(CLOCK_REALTIME, &ts);
-//printf("Ãë: %ld, ÄÉÃë: %ld\n", ts.tv_sec, ts.tv_nsec);
+//printf("ç§’: %ld, çº³ç§’: %ld\n", ts.tv_sec, ts.tv_nsec);
 struct BOARD_INDEX_STRUCT
 {
 	char  itemname[MAXDQNAMELENTH];
 	int    startpos;		// reference to the beginning of date part.
 	int    itemsize;
-	int    strlenth;		// ×Ö·û´®³¤¶È(²»°üÀ¨'\0')
-	bool   erased;			// ±íÉ¾³ı±êÖ¾
+	int    strlenth;		// å­—ç¬¦ä¸²é•¿åº¦(ä¸åŒ…æ‹¬'\0')
+	bool   erased;			// è¡¨åˆ é™¤æ ‡å¿—
 	timespec timestamp;		// write time
-	int	   typeaddr;		// ÀàĞÍÆğÊ¼µØÖ·
-	int	   typesize;		// ÀàĞÍĞòÁĞ»¯³¤¶È
+	int	   typeaddr;		// ç±»å‹èµ·å§‹åœ°å€
+	int	   typesize;		// ç±»å‹åºåˆ—åŒ–é•¿åº¦
 };
 
 struct BOARD_HEAD
 {
 	int qbdtype;
 	int counter;
-	int totalsize;		// BOARD_HEADºÍºóÃæÊı¾İÇø´óĞ¡µÄºÍ£¬²»°üÀ¨×îºóÃæµÄÀàĞÍÇø
-	int typesize;		// ×îºóÃæµÄÀàĞÍÇøµÄ´óĞ¡	mark
+	int totalsize;		// BOARD_HEADå’Œåé¢æ•°æ®åŒºå¤§å°çš„å’Œï¼Œä¸åŒ…æ‹¬æœ€åé¢çš„ç±»å‹åŒº
+	int typesize;		// æœ€åé¢çš„ç±»å‹åŒºçš„å¤§å°	mark
 	int nextpos;		// reference to the beginning of unused date part.
 	int nexttypepos;	// reference to the beginning of unused type part. mark
 	int remain;
-	int typeremain;		// ÀàĞÍÇøÊ£Óà´óĞ¡ mark
+	int typeremain;		// ç±»å‹åŒºå‰©ä½™å¤§å° mark
 	int indexcount;
 	std::mutex mutex_rw;
 	std::mutex mutex_rw_tag[MUTEXSIZE];
@@ -113,14 +113,14 @@ struct DB_INDEX_STRUCT
 {
 	char  tablename[MAXDQNAMELENTH];
 	int    startpos;		// reference to the beginning of data.
-	int    recordsize;		// ¼ÇÂ¼´óĞ¡
-	int    maxcount;		// ×î´ó¼ÇÂ¼Êı
-	int    currcount;		// µ±Ç°¼ÇÂ¼Êı
-	long   mutexaccess;     // ¿ØÖÆ»¥³â·ÃÎÊµÄ±äÁ¿ //mark Î´Ê¹ÓÃ
-	bool   erased;			// ±íÉ¾³ı±êÖ¾
+	int    recordsize;		// è®°å½•å¤§å°
+	int    maxcount;		// æœ€å¤§è®°å½•æ•°
+	int    currcount;		// å½“å‰è®°å½•æ•°
+	long   mutexaccess;     // æ§åˆ¶äº’æ–¥è®¿é—®çš„å˜é‡ //mark æœªä½¿ç”¨
+	bool   erased;			// è¡¨åˆ é™¤æ ‡å¿—
 	timespec timestamp;	// last write time
-	int	   typeaddr;		// ÀàĞÍÆğÊ¼µØÖ· mark
-	int	   typesize;		// ÀàĞÍĞòÁĞ»¯³¤¶È
+	int	   typeaddr;		// ç±»å‹èµ·å§‹åœ°å€ mark
+	int	   typesize;		// ç±»å‹åºåˆ—åŒ–é•¿åº¦
 };
 
 struct DB_HEAD
@@ -128,14 +128,14 @@ struct DB_HEAD
 	int qbdtype;
 	int counter;
 	int totalsize;
-	int typesize;		// ×îºóÃæµÄÀàĞÍÇøµÄ´óĞ¡	mark
+	int typesize;		// æœ€åé¢çš„ç±»å‹åŒºçš„å¤§å°	mark
 	int nextpos;		// reference to the beginning of unused data part.
 	int nexttypepos;	// reference to the beginning of unused type part. mark
 	int remain;
-	int typeremain;		// ÀàĞÍÇøÊ£Óà´óĞ¡ mark
+	int typeremain;		// ç±»å‹åŒºå‰©ä½™å¤§å° mark
 	int indexcount;
 	std::mutex mutex_rw;
-	std::mutex mutex_rw_tag[MUTEXSIZE];	//mark ÉĞÎ´ÊµÏÖ
+	std::mutex mutex_rw_tag[MUTEXSIZE];	//mark å°šæœªå®ç°
 	DB_INDEX_STRUCT index[INDEXSIZE];
 };
 
@@ -148,7 +148,7 @@ struct DB_HEAD
 #define QUEUEHEADSIZE   sizeof(QUEUE_HEAD)
 #define RECORDHEADSIZE  sizeof(RECORD_HEAD)
 
-extern "C" int connectgplat(const char* server, int port);
+extern "C" int  connectgplat(const char* server, int port);
 extern "C" bool readq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error);
 extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize, unsigned int* error);
 extern "C" bool clearq(int sockfd, const char* qname, unsigned int* error);
@@ -162,6 +162,15 @@ extern "C" bool readb_string(int sockfd, const char* tagname, char* value, int b
 extern "C" bool writeb_string(int sockfd, const char* tagname, const char* value, unsigned int* error);
 extern "C" bool readb_string2(int sockfd, const char* tagname, std::string& value, unsigned int* error, timespec* timestamp = 0);
 extern "C" bool writeb_string2(int sockfd, const char* tagname, std::string& value, unsigned int* error);
+
+extern "C" bool registerplcserver(int sockfd, const char* tagname, unsigned int* error);
+extern "C" bool writetoplc(int sockfd, const char* tagname, std::string& str, unsigned int* error);
+extern "C" bool writetoplc(int sockfd, const char* tagname, bool value, unsigned int* error);
+extern "C" bool writetoplc(int sockfd, const char* tagname, short value, unsigned int* error);
+extern "C" bool writetoplc(int sockfd, const char* tagname, unsigned short value, unsigned int* error);
+extern "C" bool writetoplc(int sockfd, const char* tagname, int value, unsigned int* error);
+extern "C" bool writetoplc(int sockfd, const char* tagname, unsigned int value, unsigned int* error);
+extern "C" bool writetoplc(int sockfd, const char* tagname, float value, unsigned int* error);
 
 //DllImport BOOL __cdecl GetQueuePath(LPTSTR lpPath, size_t count);
 extern "C" bool CreateB(const char* lpFileName, int size);
@@ -255,7 +264,7 @@ extern "C" bool GetLastErrorQ();
 //DllImport BOOL __cdecl ReadB( LPCTSTR  lpServerName, LPCTSTR lpBulletinName, LPCTSTR lpItemName, VOID  *lpItem, int actSize, DWORD * error, time_t *timestamp=0 );
 //DllImport BOOL __cdecl WriteB( HANDLE hServer, LPCTSTR lpBulletinName, LPCTSTR lpItemName, VOID  *lpItem, int actSize, int offset, int subSize, DWORD * error );
 //DllImport BOOL __cdecl ReadL1Tag(HANDLE hServer, LPCTSTR lpItemName, std::string& str, DWORD * error);
-//DllImport BOOL __cdecl ReadL1Tag(HANDLE hServer, LPCTSTR lpItemName, char*, int buffSize, DWORD * error);	//L1²»Ö§³ÖUNICODE×Ö·û¶ÁĞ´£¬ËùÒÔÖ»ÄÜÊÇchar*
+//DllImport BOOL __cdecl ReadL1Tag(HANDLE hServer, LPCTSTR lpItemName, char*, int buffSize, DWORD * error);	//L1ä¸æ”¯æŒUNICODEå­—ç¬¦è¯»å†™ï¼Œæ‰€ä»¥åªèƒ½æ˜¯char*
 //DllImport BOOL __cdecl ReadL1Tag(HANDLE hServer, LPCTSTR lpItemName, byte value[], int arraySize, DWORD * error);
 //DllImport BOOL __cdecl ReadL1Tag(HANDLE hServer, LPCTSTR lpItemName, std::string& str, int strLength, DWORD * error);
 //DllImport BOOL __cdecl ReadL1Tag(HANDLE hServer, LPCTSTR lpItemName, bool& value, DWORD * error);

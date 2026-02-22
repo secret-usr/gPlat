@@ -29,7 +29,11 @@ public:
 
 	void NotifySubscriber(std::string tagName, char* pPkgBody, unsigned short iBodyLength);
 	void NotifyTimerSubscriber(std::string timerName, char* pPkgBody, unsigned short iBodyLength);
-	void CancelSubscribe(lpngx_connection_t pConn, const std::list<std::string>& tagList);
+	void CancelSubscribe(lpngx_connection_t pConn, const std::list<std::string>& tagList, const std::list<std::string>& plcTagList);
+
+	bool HandleWriteBPLC(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength);
+	bool HandleWriteBStringPLC(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength);
+	void NotifyPlcIoSever(std::string tagName, char* pPkgBody, unsigned short iBodyLength);
 
 public:
 	virtual void threadRecvProcFunc(char *pMsgBuf);

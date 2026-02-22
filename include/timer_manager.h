@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <sys/timerfd.h>
 #include <sys/epoll.h>
@@ -29,13 +29,13 @@ public:
 			throw std::runtime_error("Failed to create timer resources");
 		}
 
-		// ½«timer_fd_¼ÓÈëepoll¼à¿Ø
+		// å°†timer_fd_åŠ å…¥epollç›‘æ§
 		epoll_event ev;
 		ev.events = EPOLLIN | EPOLLET;
 		ev.data.fd = timer_fd_;
 		epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, timer_fd_, &ev);
 
-		// ½«wakeup_fd_¼ÓÈëepoll¼à¿Ø
+		// å°†wakeup_fd_åŠ å…¥epollç›‘æ§
 		epoll_event ev_wake{};
 		ev_wake.events = EPOLLIN;
 		ev_wake.data.fd = wakeup_fd_;
@@ -57,7 +57,7 @@ public:
 	void stop() {
 		if (running_.exchange(false)) {
 			uint64_t one = 1;
-			write(wakeup_fd_, &one, sizeof(one)); // ÕıÈ·»½ĞÑ·½Ê½
+			write(wakeup_fd_, &one, sizeof(one)); // æ­£ç¡®å”¤é†’æ–¹å¼
 			if (worker_thread_.joinable()) {
 				worker_thread_.join();
 			}
@@ -77,11 +77,11 @@ public:
 		auto it = timers_.find(timer_id);
 		if (it == timers_.end()) return false;
 
-		// ´Ó¶ÑÖĞÒÆ³ı
+		// ä»å †ä¸­ç§»é™¤
 		auto& timer = it->second;
-		timer->valid = false; // ±ê¼ÇÎªÎŞĞ§
+		timer->valid = false; // æ ‡è®°ä¸ºæ— æ•ˆ
 
-		// Èç¹ûÈ¡ÏûµÄÊÇÏÂÒ»¸öÒª´¥·¢µÄ¶¨Ê±Æ÷£¬ĞèÒªÖØÖÃtimerfd
+		// å¦‚æœå–æ¶ˆçš„æ˜¯ä¸‹ä¸€ä¸ªè¦è§¦å‘çš„å®šæ—¶å™¨ï¼Œéœ€è¦é‡ç½®timerfd
 		if (!heap_.empty() && heap_.top()->id == timer_id) {
 			resetTimerFd();
 		}
@@ -92,25 +92,25 @@ public:
 
 private:
 	struct TimerNode {
-		uint64_t expire;      // ¾ø¶Ôµ½ÆÚÊ±¼ä(ms)
-		uint64_t interval;    // ¼ä¸ôÊ±¼ä(ms)
-		int id;               // ¶¨Ê±Æ÷ID
-		TimerCallback cb;     // »Øµ÷º¯Êı
-		void* arg;            // »Øµ÷²ÎÊı
-		bool valid = true;    // ÊÇ·ñÓĞĞ§
-		bool periodic;        // ÊÇ·ñÖÜÆÚĞÔ
+		uint64_t expire;      // ç»å¯¹åˆ°æœŸæ—¶é—´(ms)
+		uint64_t interval;    // é—´éš”æ—¶é—´(ms)
+		int id;               // å®šæ—¶å™¨ID
+		TimerCallback cb;     // å›è°ƒå‡½æ•°
+		void* arg;            // å›è°ƒå‚æ•°
+		bool valid = true;    // æ˜¯å¦æœ‰æ•ˆ
+		bool periodic;        // æ˜¯å¦å‘¨æœŸæ€§
 	};
 
 	struct TimerCompare {
 		bool operator()(const std::shared_ptr<TimerNode>& a,
 			const std::shared_ptr<TimerNode>& b) const {
-			return a->expire > b->expire; // ×îĞ¡¶Ñ
+			return a->expire > b->expire; // æœ€å°å †
 		}
 	};
 
 	int epoll_fd_;
 	int timer_fd_;
-	int wakeup_fd_; // ĞÂÔö×¨ÓÃ»½ĞÑfd
+	int wakeup_fd_; // æ–°å¢ä¸“ç”¨å”¤é†’fd
 	std::atomic<bool> running_;
 	std::thread worker_thread_;
 	std::mutex mutex_;
@@ -119,7 +119,7 @@ private:
 	std::priority_queue<
 		std::shared_ptr<TimerNode>,
 		std::vector<std::shared_ptr<TimerNode>>,
-		TimerCompare // ×Ô¶¨Òå±È½ÏÆ÷
+		TimerCompare // è‡ªå®šä¹‰æ¯”è¾ƒå™¨
 	> heap_;
 	int next_id_ = 1;
 
@@ -141,12 +141,12 @@ private:
 		if (is_next_timer || heap_.size() == 1) {
 			resetTimerFd();
 
-			// ÏÂÃæµÄ´úÂëÓĞÎó£¬²»ÄÜÍ¨¹ıwakeup_fd_»½ĞÑepoll_wait
-			// Ç¿ÖÆ»½ĞÑepoll_waitÒÔÁ¢¼´´¦ÀíĞÂ¶¨Ê±Æ÷
+			// ä¸‹é¢çš„ä»£ç æœ‰è¯¯ï¼Œä¸èƒ½é€šè¿‡wakeup_fd_å”¤é†’epoll_wait
+			// å¼ºåˆ¶å”¤é†’epoll_waitä»¥ç«‹å³å¤„ç†æ–°å®šæ—¶å™¨
 			//uint64_t one = 1;
 			//write(timer_fd_, &one, sizeof(one));
 
-			// ÕıÈ·»½ĞÑ·½Ê½
+			// æ­£ç¡®å”¤é†’æ–¹å¼
 			uint64_t one = 1;
 			write(wakeup_fd_, &one, sizeof(one)); 
 		}
@@ -156,7 +156,7 @@ private:
 
 	void resetTimerFd() {
 		if (heap_.empty()) {
-			// Ã»ÓĞ¶¨Ê±Æ÷£¬½ûÓÃtimerfd
+			// æ²¡æœ‰å®šæ—¶å™¨ï¼Œç¦ç”¨timerfd
 			struct itimerspec its = {};
 			timerfd_settime(timer_fd_, 0, &its, nullptr);
 			return;
@@ -164,12 +164,12 @@ private:
 
 		auto next_timer = heap_.top();
 		uint64_t now = getCurrentMs();
-		uint64_t delay = (next_timer->expire > now) ? (next_timer->expire - now) : 1; // ÖÁÉÙ1ms
+		uint64_t delay = (next_timer->expire > now) ? (next_timer->expire - now) : 1; // è‡³å°‘1ms
 
 		struct itimerspec its;
 		its.it_value.tv_sec = delay / 1000;
 		its.it_value.tv_nsec = (delay % 1000) * 1000000;
-		its.it_interval.tv_sec = 0; // µ¥´Î´¥·¢
+		its.it_interval.tv_sec = 0; // å•æ¬¡è§¦å‘
 		its.it_interval.tv_nsec = 0;
 
 		timerfd_settime(timer_fd_, 0, &its, nullptr);
@@ -199,13 +199,13 @@ private:
 			}
 
 			for (int i = 0; i < nfds; ++i) {
-				// ´¦Àí»½ĞÑÊÂ¼ş
+				// å¤„ç†å”¤é†’äº‹ä»¶
 				if (events[i].data.fd == wakeup_fd_) {
 					uint64_t dummy;
 					read(wakeup_fd_, &dummy, sizeof(dummy));
-					continue; // ´¿»½ĞÑ£¬ÎŞÒµÎñÂß¼­
+					continue; // çº¯å”¤é†’ï¼Œæ— ä¸šåŠ¡é€»è¾‘
 				}
-				// ´¦Àí¶¨Ê±Æ÷ÊÂ¼ş...
+				// å¤„ç†å®šæ—¶å™¨äº‹ä»¶...
 				if (events[i].data.fd == timer_fd_) {
 					uint64_t expirations;
 					read(timer_fd_, &expirations, sizeof(expirations));
@@ -213,9 +213,9 @@ private:
 				}
 			}
 
-			//mark ´¦Àí³¬Ê±Î´´¥·¢µÄÇé¿ö£¨²¹³¥»úÖÆ£©?
+			//mark å¤„ç†è¶…æ—¶æœªè§¦å‘çš„æƒ…å†µï¼ˆè¡¥å¿æœºåˆ¶ï¼‰?
 			if (nfds == 0) {
-				// Ã»ÓĞÊÂ¼ş£¬¼ì²éÊÇ·ñÓĞ¹ıÆÚµÄ¶¨Ê±Æ÷
+				// æ²¡æœ‰äº‹ä»¶ï¼Œæ£€æŸ¥æ˜¯å¦æœ‰è¿‡æœŸçš„å®šæ—¶å™¨
 				printf("......No events, checking for expired timers......\n");
 				processExpiredTimers();
 			}
@@ -231,17 +231,17 @@ private:
 			heap_.pop();
 
 			if (!timer->valid) {
-				continue; // ÒÑ±»È¡Ïû
+				continue; // å·²è¢«å–æ¶ˆ
 			}
 
-			// Ö´ĞĞ»Øµ÷£¨½âËø±ÜÃâËÀËø£©
+			// æ‰§è¡Œå›è°ƒï¼ˆè§£é”é¿å…æ­»é”ï¼‰
 			lock.unlock();
 			timer->cb(timer->arg);
 			lock.lock();
 
-			// ´¦ÀíÖÜÆÚĞÔ¶¨Ê±Æ÷
+			// å¤„ç†å‘¨æœŸæ€§å®šæ—¶å™¨
 			if (timer->periodic && timer->valid) {
-				// Ê±¼ä²¹³¥Âß¼­
+				// æ—¶é—´è¡¥å¿é€»è¾‘
 				uint64_t drift = now - timer->expire;
 				timer->expire = now + timer->interval - std::min(drift, timer->interval);
 				heap_.push(timer);
@@ -251,7 +251,7 @@ private:
 			}
 		}
 
-		// ÖØÖÃtimerfdÎªÏÂÒ»¸ö¶¨Ê±Æ÷
+		// é‡ç½®timerfdä¸ºä¸‹ä¸€ä¸ªå®šæ—¶å™¨
 		resetTimerFd();
 	}
 

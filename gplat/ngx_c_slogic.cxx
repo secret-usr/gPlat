@@ -93,9 +93,9 @@ static const handler statusHandler[] =
 		&CLogicSocket::noop,				  // PASSTOSERVER
 		&CLogicSocket::noop,				  // CLEARB
 		&CLogicSocket::noop,				  // CLEARDB
-		&CLogicSocket::HandleRegisterPLCServer, // REGISTERPLCSERVER
-		&CLogicSocket::HandleWriteBPLC,		  // WRITEBPLC
-		&CLogicSocket::HandleWriteBStringPLC, // WRITEBSTRINGPLC
+		&CLogicSocket::HandleRegisterPlcServer, // REGISTERPLCSERVER
+		&CLogicSocket::HandleWriteBPlc,		  // WRITEBPLC
+		&CLogicSocket::HandleWriteBStringPlc, // WRITEBSTRINGPLC
 };
 
 #define AUTH_TOTAL_COMMANDS sizeof(statusHandler) / sizeof(handler) // 整个数组有多少个命令
@@ -755,7 +755,7 @@ bool CLogicSocket::HandleCreateItem(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER
 	return true;
 }
 
-bool CLogicSocket::HandleRegisterPLCServer(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char *pPkgHeader, unsigned short iBodyLength)
+bool CLogicSocket::HandleRegisterPlcServer(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char *pPkgHeader, unsigned short iBodyLength)
 {
 	if (pPkgHeader == NULL)
 	{
@@ -786,7 +786,7 @@ bool CLogicSocket::HandleRegisterPLCServer(lpngx_connection_t pConn, LPSTRUC_MSG
 	return true;
 }
 
-bool CLogicSocket::HandleWriteBPLC(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char *pPkgHeader, unsigned short iBodyLength)
+bool CLogicSocket::HandleWriteBPlc(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char *pPkgHeader, unsigned short iBodyLength)
 {
 	if (pPkgHeader == NULL)
 	{
@@ -823,15 +823,12 @@ bool CLogicSocket::HandleWriteBPLC(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER 
 	pPkgHead->bodysize = pPkgHead->datasize; // 为了发布订阅的时候能拿到正确的包体长度，实际没用到
 
 	// 发布订阅
-	if (ret)
-	{
-		NotifyPlcIoSever(pPkgHead->itemname, (char *)pPkgHead + sizeof(PKGHEAD), pPkgHead->datasize);
-	}
+	NotifyPlcIoSever(pPkgHead->itemname, (char *)pPkgHead + sizeof(PKGHEAD), pPkgHead->datasize);
 
 	return true;
 }
 
-bool CLogicSocket::HandleWriteBStringPLC(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char *pPkgHeader, unsigned short iBodyLength)
+bool CLogicSocket::HandleWriteBStringPlc(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char *pPkgHeader, unsigned short iBodyLength)
 {
 	if (pPkgHeader == NULL)
 	{
@@ -869,10 +866,7 @@ bool CLogicSocket::HandleWriteBStringPLC(lpngx_connection_t pConn, LPSTRUC_MSG_H
 	pPkgHead->bodysize = pPkgHead->datasize; // 为了发布订阅的时候能拿到正确的包体长度，实际没用到
 
 	// 发布订阅
-	if (ret)
-	{
-		NotifyPlcIoSever(pPkgHead->itemname, (char *)pPkgHead + sizeof(PKGHEAD), pPkgHead->datasize);
-	}
+	NotifyPlcIoSever(pPkgHead->itemname, (char *)pPkgHead + sizeof(PKGHEAD), pPkgHead->datasize);
 
 	return true;
 }

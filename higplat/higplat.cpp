@@ -3794,7 +3794,7 @@ bool writeb_plc(int sockfd, const char* tagname, void* value, int actsize, unsig
 
 	// 初始化消息头
 	MSGSTRUCT msg{};
-	msg.head.id = WRITEPLC;
+	msg.head.id = WRITEBPLC;
 	msg.head.datasize = actsize;
 	msg.head.bodysize = actsize;
 	msg.head.offset = 0;

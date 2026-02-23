@@ -170,7 +170,7 @@ extern "C" bool write_plc_ushort(int sockfd, const char* tagname, unsigned short
 extern "C" bool write_plc_int(int sockfd, const char* tagname, int value, unsigned int* error);
 extern "C" bool write_plc_uint(int sockfd, const char* tagname, unsigned int value, unsigned int* error);
 extern "C" bool write_plc_float(int sockfd, const char* tagname, float value, unsigned int* error);
-extern "C" bool registerplcserver(int sockfd, const char* tagname, unsigned int* error);
+extern "C" bool registertag(int sockfd, const char* tagname, unsigned int* error);
 
 //DllImport BOOL __cdecl GetQueuePath(LPTSTR lpPath, size_t count);
 extern "C" bool CreateB(const char* lpFileName, int size);

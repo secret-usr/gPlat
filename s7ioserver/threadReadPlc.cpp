@@ -10,6 +10,6 @@
 
 extern std::atomic<bool> g_running;  // 控制线程运行的标志
 
-void threadFunction1() {
+void threadReadPlc() {
 
 }

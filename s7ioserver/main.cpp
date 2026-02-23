@@ -7,19 +7,15 @@
 #include <iostream>
 #include <string.h>
 
-#include "../include/higplat.h"
-
 std::atomic<bool> g_running(true);  // 控制线程运行的标志
 
-void threadFunction1();
+void threadWritePlc();
 
 int main()
 {
     // 创建并启动线程
-    std::thread worker1(threadFunction1);
-
-    // 或者分离线程让它独立运行
-    //worker.detach();
+    std::thread worker1(threadReadPlc);
+    std::thread worker2(threadWritePlc);
 
     // 主线程可以继续做其他工作...
     // 主线程等待键盘输入
@@ -38,6 +34,7 @@ int main()
 
     // 如果需要等待线程完成（虽然这个线程是无限循环）
     worker1.join();
+    worker2.join();
 
     std::cout << "main thread exit" << std::endl;
 

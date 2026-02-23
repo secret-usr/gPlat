@@ -3891,7 +3891,7 @@ bool writeb_string_plc(int sockfd, const char* tagname, const char* value, unsig
 	return (*error == 0);
 }
 
-extern "C" bool registerplcserver(int sockfd, const char* tagname, unsigned int* error)
+extern "C" bool registertag(int sockfd, const char* tagname, unsigned int* error)
 {
 	// 参数校验
 	if (!tagname || !error) {

@@ -86,7 +86,14 @@
   </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="threadfunction.cpp" />
+    <ClCompile Include="threadReadPlc.cpp" />
+    <ClCompile Include="threadWritePlc.cpp" />
+    <ClCompile Include="s7config.cpp" />
+    <ClCompile Include="..\snap7.demo.cpp\snap7.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="s7config.h" />
+    <ClInclude Include="..\snap7.demo.cpp\snap7.h" />
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile />
@@ -94,11 +101,11 @@
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <SharedLibrarySearchPath>%(SharedLibrarySearchPath)</SharedLibrarySearchPath>
-      <LibraryDependencies>higplat</LibraryDependencies>
+      <LibraryDependencies>higplat;snap7</LibraryDependencies>
       <AdditionalOptions>-Wl,-rpath,/home/gyb/projects/gPlature/bin/x64/Debug</AdditionalOptions>
     </Link>
     <ClCompile>
-      <CppLanguageStandard>c++11</CppLanguageStandard>
+      <CppLanguageStandard>c++17</CppLanguageStandard>
     </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

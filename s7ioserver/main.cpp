@@ -1,42 +1,91 @@
-﻿#include <cstdio>
+#include <cstdio>
 #include <chrono>
-#include <thread>       //std::this_thread::sleep_for   std::chrono::milliseconds
+#include <thread>
 #include <atomic>
-#include <unistd.h>     //sleep(1)
+#include <vector>
+#include <unistd.h>
 #include <signal.h>
 #include <iostream>
-#include <string.h>
+#include <cstring>
 
-std::atomic<bool> g_running(true);  // 控制线程运行的标志
+#include "s7config.h"
 
-void threadWritePlc();
+std::atomic<bool> g_running(true);
 
-int main()
+// 前向声明
+void threadReadPlc(PlcConfig* plc, AppConfig* config);
+void threadWritePlc(AppConfig* config);
+
+void signalHandler(int sig) {
+    g_running = false;
+}
+
+int main(int argc, char* argv[])
 {
-    // 创建并启动线程
-    std::thread worker1(threadReadPlc);
-    std::thread worker2(threadWritePlc);
+    // 注册信号处理
+    signal(SIGINT, signalHandler);
+    signal(SIGTERM, signalHandler);
 
-    // 主线程可以继续做其他工作...
-    // 主线程等待键盘输入
+    // 配置文件路径
+    std::string configFile = "s7ioserver.ini";
+    if (argc > 1) {
+        configFile = argv[1];
+    }
+
+    // 加载配置
+    AppConfig config;
+    if (!LoadConfig(configFile, config)) {
+        fprintf(stderr, "Failed to load config file: %s\n", configFile.c_str());
+        return 1;
+    }
+
+    // 打印配置信息
+    PrintConfig(config);
+
+    if (config.plcs.empty()) {
+        fprintf(stderr, "No PLC configured. Exiting.\n");
+        return 1;
+    }
+
+    printf("s7ioserver started. %zu PLC(s) configured.\n", config.plcs.size());
+
+    // 每个PLC启动一个读线程
+    std::vector<std::thread> readThreads;
+    for (auto& plc : config.plcs) {
+        readThreads.emplace_back(threadReadPlc, &plc, &config);
+    }
+
+    // 启动一个共享写线程
+    std::thread writeThread(threadWritePlc, &config);
+
+    // 主线程等待退出命令或信号
     std::string input;
-    while (true) {
-        std::cin >> input;  // 等待用户输入
-        if (input == "q") {
-            g_running = false;  // 通知线程退出
-            std::cout << "exiting..." << std::endl;
+    while (g_running) {
+        if (std::cin >> input) {
+            if (input == "q" || input == "quit") {
+                g_running = false;
+                printf("Shutting down...\n");
+                break;
+            } else {
+                printf("Unknown command. Type 'q' to quit.\n");
+            }
+        } else {
+            // stdin关闭（如以daemon运行），等待信号
+            while (g_running) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            }
             break;
-        }
-        else {
-            std::cout << "unknown command，input 'q' exit" << std::endl;
         }
     }
 
-    // 如果需要等待线程完成（虽然这个线程是无限循环）
-    worker1.join();
-    worker2.join();
+    g_running = false;
 
-    std::cout << "main thread exit" << std::endl;
+    // 等待所有线程结束
+    for (auto& t : readThreads) {
+        if (t.joinable()) t.join();
+    }
+    if (writeThread.joinable()) writeThread.join();
 
+    printf("s7ioserver exited.\n");
     return 0;
 }

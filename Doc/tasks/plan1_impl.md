@@ -302,6 +302,20 @@ bool reconnectSnap7(S7Object client, const PlcConfig& plc, int interval) {
 
 **连接丢失检测：** `Cli_ReadArea`/`Cli_WriteArea` 返回非零时检查 `Cli_GetConnected`，未连接则触发重连。`writeb`/`registertag` 失败时检查 socket 状态。
 
+以上技术细节总结：
+| 事项 | 处理方式 |
+|---|---|
+| 字节序 | PLC 大端 ↔ Linux 小端，用 `__builtin_bswap16/32` 转换 |
+| BOOL 读 | 从字节中提取指定位，存为 1 字节 bool |
+| BOOL 写 | 读-改-写：先读整字节，改位，写回（单写线程无竞争） |
+| STRING 读 | 从 S7 格式提取，转 C 字符串后 `writeb_string` |
+| STRING 写 | 从 C 字符串构建 S7 格式后 `Cli_WriteArea` |
+| 变化检测 | 保存每个 tag 上次原始字节，逐 tag 比较 |
+| 区域合并 | 同 area+dbnumber 内间隔 ≤32 字节的 tag 合并为一次 `Cli_ReadArea` |
+| snap7 线程安全 | 每线程独立 S7Object，读线程和写线程各自维护 PLC 连接 |
+| gPlat 连接 | 每线程独立 socket fd |
+| 自动重连 | snap7/gPlat 断开后循环重试，间隔可配（默认 3s） |
+
 ---
 
 ## 需修改/新建的文件

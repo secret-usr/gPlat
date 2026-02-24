@@ -23,6 +23,7 @@ void threadFunction1() {
  //   subscribe(conngplat, "timer_2s", &error);
  //   subscribe(conngplat, "timer_3s", &error);
  //   subscribe(conngplat, "timer_5s", &error);
+    subscribe(conngplat, "D1", &error);
 
     int a = 0;
     std::string eventname;
@@ -32,6 +33,11 @@ void threadFunction1() {
         //if (eventname != "int1") {
             printf("eventname=%s, error=%d\n", eventname.c_str(), error);
         //}
+            if (eventname == "D1") {
+                int a = *((int*)value);
+                printf("D1=%d\n", a);
+				write_plc_int(conngplat, "D2", a, &error); // 写数据
+            }
         if (eventname == "int1") {
             int a = *((int*)value);
             printf("a=%d\n", a);
@@ -81,11 +87,11 @@ void threadFunction2() {
     std::string eventname;
     while (g_running) {  // 检查全局运行标志 {
         a++;
-		ret = writeb(conngplat, "int1", &a, sizeof(a), &error); // 接收数据;
-        if (!ret) {
-            printf("writeb failed, error=%d\n", error);
-		}
-        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+		//ret = writeb(conngplat, "int1", &a, sizeof(a), &error); // 接收数据;
+  //      if (!ret) {
+  //          printf("writeb failed, error=%d\n", error);
+		//}
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
 
     printf("work thread exit\n");
@@ -103,7 +109,7 @@ void threadFunction3() {
         std::string suffix = std::to_string(a++);
         char str1[200] = "hello world, gyb 777777777777777777777777777777777777777777777777777777777777777777777777777778 loop=";
         strcat(str1, suffix.c_str()); // 将数字转换为字符串并复制到 str1
-        ret = writeb_string(conngplat, "string1", str1, &error); // 发送数据
+        //ret = writeb_string(conngplat, "string1", str1, &error); // 发送数据
 
         //char str2[1000] = { 0 };
         //ret = readb_string(conngplat, "string1", str2, sizeof(str2), &error); // 接收数据
@@ -123,7 +129,7 @@ void threadFunction3() {
         //    printf("readb_string2 failed, error=%d\n", error);
         //}
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
 
     printf("work thread exit\n");   

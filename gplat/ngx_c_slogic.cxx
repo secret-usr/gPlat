@@ -75,7 +75,7 @@ static const handler statusHandler[] =
 		&CLogicSocket::noop,				  // CLEARTB
 		&CLogicSocket::noop,				  // INSERTTB
 		&CLogicSocket::noop,				  // REFRESHTB
-		&CLogicSocket::noop,				  // READTYPE
+		&CLogicSocket::HandleReadType,		  // READTYPE
 		&CLogicSocket::HandleCreateItem,	  // CREATEITEM
 		&CLogicSocket::noop,				  // CREATETABLE
 		&CLogicSocket::noop,				  // DELETEITEM
@@ -717,6 +717,47 @@ void CLogicSocket::CancelSubscribe(lpngx_connection_t pConn, const std::list<std
 		m_subscriber.DetachPlcIoServer(plctag, pConn);
 	}
 	pConn->ClearTagList();
+}
+
+bool CLogicSocket::HandleReadType(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
+{
+	if (pPkgHeader == NULL)
+	{
+		return false;
+	}
+
+	PPKGHEAD pPkgHead = (PPKGHEAD)pPkgHeader; // 包头
+	bool ret;
+	int iLenPkgBody = pPkgHead->datasize;
+
+	CMemory* p_memory = CMemory::GetInstance();
+	char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + iLenPkgBody, false); // 准备发送的格式，这里是消息头+包头+包体
+
+	int typesize = 0;
+	if (ret = ReadType(pPkgHead->qname, pPkgHead->itemname, p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader, iLenPkgBody, &typesize))
+	{
+		pPkgHead->error = 0;
+		pPkgHead->bodysize = typesize;
+		pPkgHead->recsize = typesize;
+	}
+	else
+	{
+		pPkgHead->error = GetLastErrorQ();
+		pPkgHead->bodysize = 0;
+		pPkgHead->recsize = 0;
+	}
+
+	CLock lock(&pConn->logicPorcMutex); // 凡是和本用户有关的访问都互斥
+
+	// 填充消息头
+	memcpy(p_sendbuf, pMsgHeader, m_iLenMsgHeader); // 消息头直接拷贝到这里来
+	// 填充包头
+	memcpy(p_sendbuf + m_iLenMsgHeader, pPkgHeader, m_iLenPkgHeader); // 包头直接拷贝到这里来
+
+	// 发送数据包
+	msgSend(p_sendbuf);
+
+	return true;
 }
 
 bool CLogicSocket::HandleCreateItem(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char *pPkgHeader, unsigned short iBodyLength)

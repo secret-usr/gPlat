@@ -3779,6 +3779,172 @@ extern "C" bool CreateItem(const char* lpBoardName, const char* lpItemName, int 
 	return true;
 }
 
+/*F+F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F+++F
+Function: ReadQueueType
+
+Summary:  Read record type info.
+
+Args:     LPCTSTR  lpDqName
+[out] VOID  *lpBuff
+pointer of record type buffer
+int buffSize
+size of buff
+[out] int *pTypeSize
+type size
+
+Returns:  BOOL
+F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F---F-F*/
+extern "C" bool ReadType(const char* lpDqName, const char* lpItemName, void* inBuff, int buffSize, int* pTypeSize)
+{
+	// 从哈希表中查找该数据队列。
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpDqName, tabmsg))
+	{
+		*pTypeSize = 0;
+		return false;
+	}
+	void* lpMapAddress;
+	lpMapAddress = tabmsg.lpMapAddress;
+	int  qbdtype;
+	qbdtype = *(int*)lpMapAddress;
+
+	int loc, c;
+	if (qbdtype == QUEUE_T)
+	{
+		QUEUE_HEAD* pHead;
+		pHead = (QUEUE_HEAD*)lpMapAddress;
+
+		memcpy(inBuff, (char*)lpMapAddress + pHead->num * (pHead->size + RECORDHEADSIZE) + QUEUEHEADSIZE, pHead->typesize);
+		*pTypeSize = pHead->typesize;
+	}
+	else if (qbdtype == BOARD_T)
+	{
+		BOARD_HEAD* pHead;
+		BOARD_INDEX_STRUCT* pIndex;
+		pHead = (BOARD_HEAD*)lpMapAddress;
+		pIndex = pHead->index;
+
+		loc = hash1(lpItemName);
+		c = hash2(lpItemName);
+		// search item in bulletin's index(hash table)
+		while (strcmp(pIndex[loc].itemname, "\0") && strcmp(pIndex[loc].itemname, lpItemName))
+		{
+			loc = (loc + c) % INDEXSIZE;
+		}
+
+		if (!strcmp(pIndex[loc].itemname, "\0") || pIndex[loc].erased || pIndex[loc].typesize == 0)
+		{
+			// item not found
+			*pTypeSize = 0;
+			return false;
+		}
+
+		memcpy(inBuff, (char*)lpMapAddress + pHead->totalsize + pIndex[loc].typeaddr, pIndex[loc].typesize);
+		*pTypeSize = pIndex[loc].typesize;
+	}
+	else if (qbdtype == DATABASE_T)
+	{
+		DB_HEAD* pHead;
+		DB_INDEX_STRUCT* pIndex;
+		pHead = (DB_HEAD*)lpMapAddress;
+		pIndex = pHead->index;
+
+		loc = hash1(lpItemName);
+		c = hash2(lpItemName);
+		// search item in bulletin's index(hash table)
+		while (strcmp(pIndex[loc].tablename, "\0") && strcmp(pIndex[loc].tablename, lpItemName))
+		{
+			loc = (loc + c) % INDEXSIZE;
+		}
+
+		if (!strcmp(pIndex[loc].tablename, "\0") || pIndex[loc].erased || pIndex[loc].typesize == 0)
+		{
+			// item not found
+			*pTypeSize = 0;
+			return false;
+		}
+
+		memcpy(inBuff, (char*)lpMapAddress + pHead->totalsize + pIndex[loc].typeaddr, pIndex[loc].typesize);
+		*pTypeSize = pIndex[loc].typesize;
+	}
+	return true;
+}
+
+extern "C" bool readtype(int sockfd, char* qbdname, char* tagname, void* inbuff, int buffsize, int* ptypesize, unsigned int* error)
+{
+	// 参数校验
+	if ((!tagname && !qbdname) || !inbuff || !error || buffsize <= 0) {
+		*error = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	// 初始化消息头
+	MSGSTRUCT msg{};
+	msg.head.id = READTYPE;
+	msg.head.datasize = buffsize;
+	msg.head.bodysize = 0;
+
+	// 安全拷贝字符串
+	if (qbdname != 0)
+	{
+		strncpy(msg.head.qname, qbdname, sizeof(msg.head.qname) - 1);
+		msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+	}
+
+	if (tagname != 0)
+	{
+		strncpy(msg.head.itemname, tagname, sizeof(msg.head.itemname) - 1);
+		msg.head.itemname[sizeof(msg.head.itemname) - 1] = '\0';
+	}
+
+	if ( tagname != 0 && tagname[0] != 0)
+	{
+		//只有一个board
+		strncpy(msg.head.qname, "BOARD", sizeof(msg.head.qname) - 1);
+		msg.head.qname[sizeof(msg.head.qname) - 1] = '\0';
+	}
+
+	// 发送请求
+	if (send_all(sockfd, &msg, sizeof(MSGHEAD)) <= 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取响应头
+	if (readn(sockfd, &msg, sizeof(MSGHEAD)) < 0) {
+		*error = errno;
+		close(sockfd);
+		return false;
+	}
+
+	*ptypesize = msg.head.bodysize;
+
+	// 检查错误码
+	*error = msg.head.error;
+	if (*error != 0 || msg.head.bodysize == 0) {
+		return false;
+	}
+
+	// 验证数据大小
+	if (msg.head.bodysize > buffsize) {
+		*error = ERROR_BUFFER_TOO_SMALL;
+		close(sockfd);
+		return false;
+	}
+
+	// 读取数据体（如果有）
+	if (msg.head.bodysize > 0) {
+		if (readn(sockfd, inbuff, msg.head.bodysize) < 0) {
+			*error = errno;
+			close(sockfd);
+			return false;
+		}
+	}
+
+	return true;
+}
+
 bool writeb_plc(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error)
 {
 	// 参数校验

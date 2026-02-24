@@ -8,7 +8,7 @@
 #include <unistd.h>
 
 #include "../include/higplat.h"
-#include "../snap7.demo.cpp/snap7.h"
+#include "../include/snap7.h"
 #include "s7config.h"
 
 extern std::atomic<bool> g_running;

@@ -89,11 +89,9 @@
     <ClCompile Include="threadReadPlc.cpp" />
     <ClCompile Include="threadWritePlc.cpp" />
     <ClCompile Include="s7config.cpp" />
-    <ClCompile Include="..\snap7.demo.cpp\snap7.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="s7config.h" />
-    <ClInclude Include="..\snap7.demo.cpp\snap7.h" />
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile />

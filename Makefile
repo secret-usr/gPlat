@@ -73,13 +73,21 @@ HELLO_OBJ := $(BUILD_DIR)/include/hello.o
 TESTAPP_BIN := $(BIN_DIR)/TestApplication
 TESTAPP_LDFLAGS := -L$(LIB_DIR) -lhigplat -Wl,-rpath,'$$ORIGIN/../lib'
 
+# --- Module: toolgplat (Tool) ---
+TOOLGPLAT_DIR := toolgplat
+TOOLGPLAT_SRCS := $(wildcard $(TOOLGPLAT_DIR)/*.cpp)
+TOOLGPLAT_OBJS := $(patsubst $(TOOLGPLAT_DIR)/%.cpp, $(BUILD_DIR)/$(TOOLGPLAT_DIR)/%.o, $(TOOLGPLAT_SRCS))
+TOOLGPLAT_BIN := $(BIN_DIR)/toolgplat
+TOOLGPLAT_INCLUDES := -Iinclude
+TOOLGPLAT_LDFLAGS := -lreadline -L$(LIB_DIR) -lhigplat -Wl,-rpath,'$$ORIGIN/../lib'
+
 # ==========================================
 # 4. Targets
 # ==========================================
 
 .PHONY: all clean directories help
 
-all: directories $(GPLAT_BIN) $(HIGPLAT_LIB) $(CREATEQ_BIN) $(TESTAPP_BIN)
+all: directories $(GPLAT_BIN) $(HIGPLAT_LIB) $(CREATEQ_BIN) $(TESTAPP_BIN) $(TOOLGPLAT_BIN)
 	@echo "OK"
 
 directories:
@@ -132,6 +140,16 @@ $(HELLO_OBJ): $(HELLO_SRC)
 	@echo "Compiling $<"
 	@$(CXX) $(CXXFLAGS) -c $< -o $@
 
+# --- Rules for toolgplat ---
+$(TOOLGPLAT_BIN): $(TOOLGPLAT_OBJS) $(HIGPLAT_LIB)
+	@echo "Linking $@"
+	@$(CXX) $(LDFLAGS) $(TOOLGPLAT_OBJS) $(TOOLGPLAT_LDFLAGS) -o $@
+
+$(BUILD_DIR)/$(TOOLGPLAT_DIR)/%.o: $(TOOLGPLAT_DIR)/%.cpp
+	@mkdir -p $(@D)
+	@echo "Compiling $<"
+	@$(CXX) $(CXXFLAGS) $(TOOLGPLAT_INCLUDES) -c $< -o $@
+
 
 clean:
 	@echo "Cleaning build artifacts..."
@@ -140,7 +158,7 @@ clean:
 
 help:
 	@echo "Available targets:"
-	@echo "  all      : Build all modules (gplat, higplat, createq, TestApplication)"
+	@echo "  all      : Build all modules (gplat, higplat, createq, TestApplication, toolgplat)"
 	@echo "  clean    : Remove build directories and binaries"
 
 # Include dependency files
@@ -148,3 +166,4 @@ help:
 -include $(HIGPLAT_OBJS:.o=.d)
 -include $(CREATEQ_OBJS:.o=.d)
 -include $(TESTAPP_OBJS:.o=.d)
+-include $(TOOLGPLAT_OBJS:.o=.d)

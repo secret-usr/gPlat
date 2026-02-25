@@ -511,6 +511,51 @@ extern "C" unsigned int GetLastErrorQ()
 	return errorCode;
 }
 
+
+/**
+ * 读取 BOARD 头部信息，远程调用接口
+ * @param sockfd 已连接的套接字描述符
+ * @param boardname 目标 BOARD 名称
+ * @param head 输出参数，接收 BOARD 头部信息
+ * @param error 输出参数，接收错误码
+ * @return 成功返回 true，失败返回 false
+ */
+extern "C" bool readheadb(int sockfd, const char* boardname, void* head, unsigned int* error)
+{
+    MSGSTRUCT msg;
+    memset(&msg, 0, sizeof(msg));
+    msg.head.id = READHEADB;
+    msg.head.bodysize = 0;
+    strcpy(msg.head.qname, boardname);
+
+    if (send_all(sockfd, (char*)&msg, sizeof(MSGHEAD)) == -1)
+    {
+        *error = errno;
+        return false;
+    }
+
+    MSGHEAD msg_head;
+    if (readn(sockfd, (char*)&msg_head, sizeof(MSGHEAD)) == -1)
+    {
+        *error = errno;
+        return false;
+    }
+
+    if (msg_head.error != 0)
+    {
+        *error = msg_head.error;
+        return false;
+    }
+
+    if (readn(sockfd, (char*)head, msg_head.bodysize) == -1)
+    {
+        *error = errno;
+        return false;
+    }
+
+    return true;
+}
+
 extern "C" int connectgplat(const char* server, int port)
 {
 	// 参数校验
@@ -1559,6 +1604,29 @@ extern "C" bool ReadHead(const char* lpDqName, void* lpHead)
 	memcpy(lpHead, tabmsg.lpMapAddress, QUEUEHEADSIZE);
 	//ReleaseMutex(tabmsg.hMutex);
 	pthread_mutex_unlock(&tabmsg.hMutex);
+	return true;
+}
+
+/**
+ * 本地调用，读取 bulletin 的头信息
+ * @param lpBoardName 
+ * @param lpHead 
+ * @return 成功返回 true，失败返回 false
+ */
+extern "C" bool ReadHeadB(const char* lpBoardName, void* lpHead)
+{
+	struct TABLE_MSG tabmsg;
+	if (!fetchtab(lpBoardName, tabmsg))
+	{
+		return false;
+	}
+	void* lpMapAddress;
+	lpMapAddress = tabmsg.lpMapAddress;
+
+	tabmsg.pmutex_rw->lock();
+	memcpy(lpHead, lpMapAddress, sizeof(BOARD_HEAD));
+	tabmsg.pmutex_rw->unlock();
+
 	return true;
 }
 

@@ -137,7 +137,7 @@ static const handler statusHandler[] =
 	 //DELETETABLE,
 	 &CLogicSocket::noop,
 	 //READHEADB,
-	 &CLogicSocket::noop,
+	 &CLogicSocket::HandleReadHeadB,
 	 //READHEADDB,
 	 &CLogicSocket::noop,
 	 //ACK,
@@ -1060,6 +1060,49 @@ bool CLogicSocket::HandleCreateItem(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER
 	LPSTRUCT_REGISTER p_sendInfo = (LPSTRUCT_REGISTER)(p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader);	//跳过消息头，跳过包头，就是包体了
 
 	//f)发送数据包
+	msgSend(p_sendbuf);
+
+	return true;
+}
+
+/**
+ * 服务器处理 READHEADB 报文，通过调用 ReadHeadB 函数读取 BOARD_HEAD 数据，并将结果发送回客户端。
+ * @param pConn 当前连接对象
+ * @param pMsgHeader 消息头，包含连接信息和序列号等
+ * @param pPkgHeader 包头，包含命令和参数等
+ * @param iBodyLength 包体长度
+ * @return 处理结果，成功返回 true，失败返回 false
+ */
+bool CLogicSocket::HandleReadHeadB(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgHeader, unsigned short iBodyLength)
+{
+	if (pPkgHeader == NULL) {
+		return false;
+	}
+
+	PPKGHEAD pPkgHead = (PPKGHEAD)pPkgHeader;
+	bool ret;
+	
+	CMemory* p_memory = CMemory::GetInstance();
+    int headSize = sizeof(BOARD_HEAD);
+	char* p_sendbuf = (char*)p_memory->AllocMemory(m_iLenMsgHeader + m_iLenPkgHeader + headSize, false);
+    
+    // Attempt to read the board header locally
+	if (ret = ReadHeadB(pPkgHead->qname, p_sendbuf + m_iLenMsgHeader + m_iLenPkgHeader))
+	{
+		pPkgHead->error = 0;
+		pPkgHead->bodysize = headSize;
+	}
+	else
+	{
+		pPkgHead->error = GetLastErrorQ();
+		pPkgHead->bodysize = 0;
+	}
+
+	CLock lock(&pConn->logicPorcMutex); 
+
+	memcpy(p_sendbuf, pMsgHeader, m_iLenMsgHeader);           
+	memcpy(p_sendbuf + m_iLenMsgHeader, pPkgHeader, m_iLenPkgHeader);         
+
 	msgSend(p_sendbuf);
 
 	return true;

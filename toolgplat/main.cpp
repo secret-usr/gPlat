@@ -8,6 +8,8 @@
 #include <cstdlib> // for strtol
 #include <unistd.h>
 #include <string.h>
+#include <iomanip>
+#include <ctime>
 #include "..//include//higplat.h"
 
 
@@ -458,6 +460,201 @@ void HandleCreate(const std::vector<std::string>& words)
     }
 }
 
+void HandleMan()
+{
+    struct CommandInfo {
+        std::string name;
+        std::string usage;
+        std::string desc;
+    };
+
+    static const std::vector<CommandInfo> commands = {
+        {"connect", "connect [ip]", "Connect to server (default 127.0.0.1)"},
+        {"openb", "openb", "Open BOARD"},
+        {"create", "create <name> <type> [arr_size]", "Create a new tag"},
+        {"select", "select <tagname>", "Read data from a tag"},
+        {"list", "list", "List all tag names in the opened board"},
+        {"man", "man", "Show this help message"},
+        {"exit", "exit (or q)", "Exit the tool"}
+    };
+
+    std::cout << std::left << std::setw(12) << "Command" 
+              << std::setw(35) << "Usage" 
+              << "Function" << std::endl;
+    std::cout << std::string(80, '-') << std::endl;
+
+    for (const auto& cmd : commands)
+    {
+        std::cout << std::left << std::setw(12) << cmd.name 
+                  << std::setw(35) << cmd.usage 
+                  << cmd.desc << std::endl;
+    }
+}
+
+void HandleList()
+{
+    if (GlobalObj::qbdname.empty())
+    {
+        std::cout << "No db or board opened." << std::endl;
+        return;
+    }
+    
+    if (g_qbdtype != board) {
+        std::cout << "List is only supported for BOARD type." << std::endl;
+        return;
+    }
+
+    // Allocate memory for BOARD_HEAD
+    // Note: sizeof(BOARD_HEAD) includes the full index array
+    BOARD_HEAD* pHead = (BOARD_HEAD*)malloc(sizeof(BOARD_HEAD));
+    if (pHead == NULL) {
+        std::cout << "Failed to allocate memory for board header." << std::endl;
+        return;
+    }
+
+    unsigned int error = 0;
+    if (readheadb(g_hConn, GlobalObj::qbdname.c_str(), pHead, &error))
+    {
+        std::cout << "\nExisting Tags in " << GlobalObj::qbdname << ":" << std::endl;
+        std::cout << std::left 
+                  << std::setw(8)  << "Index"
+                  << std::setw(30) << "itemname" 
+                  << std::setw(12) << "itemsize" 
+                  << std::setw(12) << "typesize"
+                  << "timestamp(UTC+8)" << std::endl;
+        std::cout << std::string(90, '-') << std::endl;
+
+        int count = 0;
+        for (int i = 0; i < INDEXSIZE; i++)
+        {
+            // Check if itemname is not empty string and not erased
+            if (pHead->index[i].itemname[0] != '\0' && !pHead->index[i].erased)
+            {
+                char timebuf[64] = {0};
+                time_t seconds = pHead->index[i].timestamp.tv_sec;
+                seconds += 8 * 3600; // UTC+8
+                struct tm* tm_info = gmtime(&seconds);
+                if (tm_info) {
+                    strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S", tm_info);
+                }
+
+                std::cout << std::left 
+                          << std::setw(8)  << i
+                          << std::setw(30) << pHead->index[i].itemname 
+                          << std::setw(12) << pHead->index[i].itemsize
+                          << std::setw(12) << pHead->index[i].typesize
+                          << timebuf << std::endl;
+                
+                count++;
+            }
+        }
+        std::cout << "\nTotal tags found: " << count << std::endl;
+    }
+    else
+    {
+        std::cout << "Failed to list tags. Error code: " << error << std::endl;
+    }
+
+    free(pHead);
+}
+
+void HandleSelect(const std::string& tagName)
+{
+    if (GlobalObj::qbdname.empty())
+    {
+        std::cout << "No db or board opened." << std::endl;
+        return;
+    }
+
+    if (g_qbdtype != board) {
+        std::cout << "Select is only supported for BOARD type." << std::endl;
+        return;
+    }
+
+    // 1. Get Board Header to find item size
+    BOARD_HEAD* pHead = (BOARD_HEAD*)malloc(sizeof(BOARD_HEAD));
+    if (pHead == NULL) {
+        std::cout << "Failed to allocate memory for board header." << std::endl;
+        return;
+    }
+
+    unsigned int error = 0;
+    if (!readheadb(g_hConn, GlobalObj::qbdname.c_str(), pHead, &error))
+    {
+        std::cout << "Failed to read board header. Error code: " << error << std::endl;
+        free(pHead);
+        return;
+    }
+
+    int itemSize = -1;
+    for (int i = 0; i < INDEXSIZE; i++)
+    {
+        if (pHead->index[i].itemname[0] != '\0' && !pHead->index[i].erased)
+        {
+            if (tagName == pHead->index[i].itemname)
+            {
+                itemSize = pHead->index[i].itemsize;
+                break;
+            }
+        }
+    }
+    free(pHead); // Done with header
+
+    if (itemSize == -1)
+    {
+        std::cout << "Tag '" << tagName << "' not found." << std::endl;
+        return;
+    }
+
+    // 2. Read Data using readb
+    char* buffer = new char[itemSize + 1]; // +1 for safety if treated as string later
+    memset(buffer, 0, itemSize + 1);
+    timespec ts = {0, 0};
+
+    if (readb(g_hConn, tagName.c_str(), buffer, itemSize, &error, &ts))
+    {
+        char timebuf[64] = {0};
+        time_t seconds = ts.tv_sec;
+        seconds += 8 * 3600; // UTC+8
+        struct tm* tm_info = gmtime(&seconds);
+        if (tm_info) {
+            strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S", tm_info);
+        }
+
+        std::cout << "Read Tag '" << tagName << "' successfully." << std::endl;
+        std::cout << "Timestamp: " << timebuf << " (UTC+8)" << std::endl;
+        std::cout << "Data Size: " << itemSize << " bytes" << std::endl;
+        std::cout << "Data (Hex): " << std::endl;
+        
+        // Hex Dump
+        for (int i = 0; i < itemSize; ++i)
+        {
+            std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)(unsigned char)buffer[i] << " ";
+            if ((i + 1) % 16 == 0) std::cout << std::endl;
+        }
+        std::cout << std::dec << std::endl; // Restore dec
+
+        // Try printing as string if it looks printable
+        bool isPrintable = true;
+        for(int i=0; i<itemSize; ++i) {
+             if (buffer[i] == 0 && i == itemSize - 1) continue; // Null terminator at end is fine
+             if (buffer[i] != 0 && !isprint((unsigned char)buffer[i])) { 
+                 isPrintable = false; 
+                 break; 
+             }
+        }
+        if (isPrintable && itemSize > 0) {
+            std::cout << "Data (String): " << buffer << std::endl;
+        }
+    }
+    else
+    {
+        std::cout << "Failed to read tag '" << tagName << "'. Error code: " << error << std::endl;
+    }
+
+    delete[] buffer;
+}
+
 void Analyse(const std::vector<std::string>& words)
 {
     if (words.empty()) return;
@@ -490,6 +687,18 @@ void Analyse(const std::vector<std::string>& words)
     }
 
  //   if (words.size() < 2)
+    if (cmd == "man")
+    {
+        HandleMan();
+        return;
+    }
+
+    if (cmd == "list")
+    {
+        HandleList();
+        return;
+    }
+
  //   {
  //       std::cout << "Syntax error." << std::endl;
  //       return;
@@ -521,7 +730,17 @@ void Analyse(const std::vector<std::string>& words)
  //       HandleOpenDB(words[1]);
  //       return;
  //   }
+   if (cmd == "select")
+    {
+        if (words.size() < 2) {
+             std::cout << "Usage: select <tagname>" << std::endl;
+        } else {
+             HandleSelect(words[1]);
+        }
+        return;
+    }
 
+ 
  //   if (cmd == "select")
  //   {
  //       HandleSelect(words[1]);

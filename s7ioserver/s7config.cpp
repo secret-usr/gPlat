@@ -1,5 +1,5 @@
 #include "s7config.h"
-#include "../snap7.demo.cpp/snap7.h"
+#include "../include/snap7.h"
 
 #include <fstream>
 #include <sstream>

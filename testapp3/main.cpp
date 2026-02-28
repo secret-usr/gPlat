@@ -32,7 +32,27 @@ int main()
 	sensorData.temperature = 25;
 	sensorData.location = "车间1-区域A";
 
+	SensorData sensorarr[3];
+	sensorarr[0] = sensorData;
+	sensorarr[1] = sensorData;
+	sensorarr[2] = sensorData;
+	sensorarr[1].location = "车间1-区域B";
+	sensorarr[2].location = "车间1-区域C";
+
 	ret = writeb(h, "sensor1", &sensorData, sizeof(sensorData), &err);
+	assert(ret);
+
+	MotorStatus motorStatus;
+	motorStatus.current = 12.5f;
+	motorStatus.error_code = 0;
+	motorStatus.run_count = 12345;
+	motorStatus.speed[0] = 1000.0f;
+	motorStatus.speed[1] = 1500.0f;
+	motorStatus.speed[2] = 2000.0f;
+	motorStatus.motor_name = "主电机";
+
+
+	ret = writeb(h, "motorstatus", &motorStatus, sizeof(motorStatus), &err);
 	assert(ret);
 
 	printf("exit\n");

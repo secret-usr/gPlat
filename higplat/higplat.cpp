@@ -3857,6 +3857,7 @@ extern "C" bool CreateItem(const char* lpBoardName, const char* lpItemName, int 
 	{
 		pIndex[loc].typesize = 0;
 	}
+	memset((char*)lpMapAddress + sizeof(BOARD_HEAD) + pIndex[loc].startpos, 0, itemSize);
 	//ReleaseMutex(hMutex);
 	return true;
 }

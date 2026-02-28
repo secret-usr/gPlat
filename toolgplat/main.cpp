@@ -648,7 +648,29 @@ void SelectTag(std::string tagName)
 						std::cout << "  " << fi.name << ": ";
 						const TypeInfo* ti = FindTypeByCode((int)fi.type);
 						if (ti && ti->print)
-							ti->print(std::cout, base + fi.offset);
+						{
+							// 检查是否是数组（数组的 size 会大于单个元素的 size）
+							// 注意：String 类型的 ti->size 为 0，直接使用 fi.size
+							int element_size = ti->size;
+							int array_count = (element_size > 0) ? (fi.size / element_size) : 1;
+
+							if (array_count > 1)
+							{
+								// 数组字段，打印所有元素
+								std::cout << "[";
+								for (int a = 0; a < array_count; a++)
+								{
+									if (a > 0) std::cout << ", ";
+									ti->print(std::cout, base + fi.offset + a * element_size);
+								}
+								std::cout << "]";
+							}
+							else
+							{
+								// 标量字段（包括 String 类型）
+								ti->print(std::cout, base + fi.offset);
+							}
+						}
 						else
 							PrintHex(std::cout, base + fi.offset, fi.size);
 						std::cout << std::endl;

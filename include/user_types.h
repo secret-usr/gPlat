@@ -35,7 +35,7 @@ REGISTER_STRUCT(SensorData,
 #pragma pack(push, 8)
 
 struct MotorStatus {
-	float         speed;
+	float         speed[3];
 	float         current;
 	int32_t       error_code;
 	uint32_t      run_count;
@@ -45,7 +45,7 @@ struct MotorStatus {
 #pragma pack(pop)
 
 REGISTER_STRUCT(MotorStatus,
-	FIELD_DESC(Single,  MotorStatus, speed),
+	FIELD_DESC_ARRAY(Single,  MotorStatus, speed, 3),
 	FIELD_DESC(Single,  MotorStatus, current),
 	FIELD_DESC(Int32,   MotorStatus, error_code),
 	FIELD_DESC(UInt32,  MotorStatus, run_count),

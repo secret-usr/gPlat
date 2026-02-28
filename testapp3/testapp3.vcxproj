@@ -35,14 +35,15 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{4056c21b-7132-4687-bf10-30589b63c7e0}</ProjectGuid>
+    <ProjectGuid>{2806C55F-7755-4619-BF5A-8D8420AB7778}</ProjectGuid>
     <Keyword>Linux</Keyword>
-    <RootNamespace>include</RootNamespace>
+    <RootNamespace>TestApplication</RootNamespace>
     <MinimumVisualStudioVersion>15.0</MinimumVisualStudioVersion>
     <ApplicationType>Linux</ApplicationType>
     <ApplicationTypeRevision>1.0</ApplicationTypeRevision>
     <TargetLinuxPlatform>Generic</TargetLinuxPlatform>
     <LinuxProjectType>{D51BCBC9-82E9-4017-911E-C93873C4EA2B}</LinuxProjectType>
+    <ProjectName>testapp3</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'" Label="Configuration">
@@ -76,26 +77,28 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <CopyAdditionalIncludes>false</CopyAdditionalIncludes>
+    <LibraryPath>
+    </LibraryPath>
     <RemoteOutRelDir>$(Platform)/$(Configuration)</RemoteOutRelDir>
     <OutDir>$(ProjectDir)..\$(Platform)\$(Configuration)\</OutDir>
+    <TargetExt />
   </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="hello.h" />
-    <ClInclude Include="higplat.h" />
-    <ClInclude Include="msg.h" />
-    <ClInclude Include="podstring.h" />
-    <ClInclude Include="qbdtype.h" />
-    <ClInclude Include="snap7.h" />
-    <ClInclude Include="struct_reflect.h" />
-    <ClInclude Include="struct_registry.h" />
-    <ClInclude Include="timer_manager.h" />
-    <ClInclude Include="type_code.h" />
-    <ClInclude Include="user_types.h" />
+    <None Include="assessment.md" />
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile />
+    <Link>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <SharedLibrarySearchPath>%(SharedLibrarySearchPath)</SharedLibrarySearchPath>
+      <LibraryDependencies>higplat</LibraryDependencies>
+      <AdditionalOptions>-Wl,-rpath,/home/gyb/projects/gPlature/bin/x64/Debug</AdditionalOptions>
+    </Link>
     <ClCompile>
       <CppLanguageStandard>c++17</CppLanguageStandard>
     </ClCompile>

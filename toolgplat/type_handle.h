@@ -2,26 +2,12 @@
 #define TYPE_HANDLE_H_
 
 #include <cstdint>
-#include <cstring>
 #include <iostream>
 #include <string>
 #include <unordered_map>
 
-// -1 代表复合类型
-enum TypeCode
-{
-	Empty = 0,
-	Boolean,
-	Char,
-	Int16,
-	UInt16,
-	Int32,
-	UInt32,
-	Int64,
-	UInt64,
-	Single,
-	Double,
-};
+#include "../include/type_code.h"
+#include "../include/struct_registry.h"
 
 // --- 类型描述 ---
 
@@ -52,6 +38,12 @@ inline void PrintChar(std::ostream& os, const void* value)
 	os << *reinterpret_cast<const char*>(value);
 }
 
+// PodString 特殊处理（m_data 在 offset 0，对象地址即 C 字符串地址）
+inline void PrintString(std::ostream& os, const void* value)
+{
+	os << '"' << reinterpret_cast<const char*>(value) << '"';
+}
+
 // --- 注册表 ---
 
 // 名称 -> TypeInfo  (如 "Boolean" -> {Boolean, 1, PrintBool})
@@ -68,6 +60,7 @@ inline const std::unordered_map<std::string, TypeInfo>& GetTypeByName()
 		{"UInt64",  {UInt64,  (int)sizeof(uint64_t), PrintValue<uint64_t>}},
 		{"Single",  {Single,  (int)sizeof(float),    PrintValue<float>}},
 		{"Double",  {Double,  (int)sizeof(double),   PrintValue<double>}},
+		{"String",  {String,  0,                      PrintString}},  // size=0: 实际大小由 FieldInfo.size 提供
 	};
 	return table;
 }
@@ -86,6 +79,7 @@ inline const std::unordered_map<int, TypeInfo>& GetTypeByCode()
 		{UInt64,  {UInt64,  (int)sizeof(uint64_t), PrintValue<uint64_t>}},
 		{Single,  {Single,  (int)sizeof(float),    PrintValue<float>}},
 		{Double,  {Double,  (int)sizeof(double),   PrintValue<double>}},
+		{String,  {String,  0,                      PrintString}},  // size=0: 实际大小由 FieldInfo.size 提供
 	};
 	return table;
 }

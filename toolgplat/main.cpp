@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib> // for strtol
+#include <iomanip>
 #include <fstream>
 #include <unistd.h>
 #include <string.h>
@@ -212,6 +213,41 @@ bool CreateTag(const std::string& tagName, const std::string& para, const std::s
 		const TypeInfo* ti = FindTypeByName(typeName);
 		if (!ti)
 		{
+			// 查找已注册的自定义 struct
+			const StructInfo* si = FindStructByName(typeName);
+			if (si)
+			{
+				size_t itemsize = si->total_size;
+				size_t tagsize = (arraysize > 1) ? itemsize * arraysize : itemsize;
+
+				if (tagsize > 16000)
+				{
+					std::cout << "TAG的大小超过了16000，无法创建" << std::endl;
+					return false;
+				}
+
+				// 构建类型元数据 buffer: [typecode=-1][arraysize][classname\0]
+				char buff[128];
+				int* ptypecode = (int*)buff;
+				int* parraysize_p = (int*)(buff + 4);
+				*ptypecode = -1;
+				*parraysize_p = (arraysize > 1) ? arraysize : 0;
+				char* classname = buff + 8;
+				strcpy(classname, typeName.c_str());
+				int typesize = 8 + typeName.length() + 1;
+
+				unsigned int err;
+				bool res = createtag(g_hConn, tagName.c_str(), tagsize, buff, typesize, &err);
+
+				if (res)
+					std::cout << "Tag '" << tagName << "' created (struct " << typeName
+						<< ", " << itemsize << " bytes)" << std::endl;
+				else
+					std::cout << "Create Tag '" << tagName << "' fail with error code " << err << std::endl;
+
+				return res;
+			}
+
 			std::cout << "Type definition error!" << std::endl;
 			return false;
 		}
@@ -508,6 +544,14 @@ void DeleteTag(std::string itemName)
 	}
 }
 
+inline void PrintHex(std::ostream& os, const void* data, int size)
+{
+	const unsigned char* p = (const unsigned char*)data;
+	for (int i = 0; i < size && i < 64; i++)
+		os << std::hex << std::setw(2) << std::setfill('0') << (int)p[i] << " ";
+	os << std::dec;
+}
+
 void SelectTag(std::string tagName)
 {
 	// 获取记录类型
@@ -569,6 +613,50 @@ void SelectTag(std::string tagName)
 						std::cout << "last write time: " << std::asctime(std::localtime(&timestamp.tv_sec));
 					}
 				}
+			}
+		}
+		else if (typecode == -1)
+		{
+			// 自定义 struct 类型
+			const char* classname = buffer + 8;
+			const StructInfo* si = FindStructByName(classname);
+
+			if (!si)
+			{
+				std::cout << "Custom type '" << classname
+					<< "' not found in local registry." << std::endl;
+				return;
+			}
+
+			int itemcount = (arraysize > 0) ? arraysize : 1;
+			int totalsize = si->total_size * itemcount;
+			std::vector<char> data(totalsize);
+			timespec timestamp;
+
+			if (readb(g_hConn, tagName.c_str(), data.data(), totalsize, &err, &timestamp))
+			{
+				for (int idx = 0; idx < itemcount; idx++)
+				{
+					if (itemcount > 1)
+						std::cout << "[" << idx << "]" << std::endl;
+
+					char* base = data.data() + idx * si->total_size;
+
+					for (int f = 0; f < si->field_count; f++)
+					{
+						const FieldInfo& fi = si->fields[f];
+						std::cout << "  " << fi.name << ": ";
+						const TypeInfo* ti = FindTypeByCode((int)fi.type);
+						if (ti && ti->print)
+							ti->print(std::cout, base + fi.offset);
+						else
+							PrintHex(std::cout, base + fi.offset, fi.size);
+						std::cout << std::endl;
+					}
+				}
+				std::cout << "-------------------------------------" << std::endl;
+				std::cout << "last write time: "
+					<< std::asctime(std::localtime(&timestamp.tv_sec));
 			}
 		}
 	}
@@ -659,6 +747,27 @@ void Analyse(const std::vector<std::string>& words)
 	if (cmd == "delete")
 	{
 		HandleDelete(words[1]);
+		return;
+	}
+
+	if (cmd == "types")
+	{
+		std::cout << "Built-in types:" << std::endl;
+		for (auto& [name, info] : GetTypeByName())
+			std::cout << "  " << name << "  (" << info.size << " bytes)" << std::endl;
+
+		std::cout << std::endl << "Registered struct types:" << std::endl;
+		for (auto& [name, info] : GetStructRegistry())
+		{
+			std::cout << "  " << name << "  (" << info->total_size << " bytes, "
+				<< info->field_count << " fields)" << std::endl;
+			for (int i = 0; i < info->field_count; i++)
+			{
+				const FieldInfo& f = info->fields[i];
+				std::cout << "    +" << f.offset << "  " << f.name << "  ("
+					<< f.size << " bytes)" << std::endl;
+			}
+		}
 		return;
 	}
 

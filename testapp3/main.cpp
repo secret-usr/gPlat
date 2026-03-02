@@ -38,7 +38,6 @@ int main()
 	sensorarr[2] = sensorData;
 	sensorarr[1].location = "车间1-区域B";
 	sensorarr[2].location = "车间1-区域C";
-
 	ret = writeb(h, "sensor1", &sensorData, sizeof(sensorData), &err);
 	assert(ret);
 
@@ -52,9 +51,21 @@ int main()
 	motorStatus.motor_name[0] = "主电机";
 	motorStatus.motor_name[1] = "副电机A";
 	motorStatus.motor_name[2] = "副电机B";
-
-
 	ret = writeb(h, "motorstatus", &motorStatus, sizeof(motorStatus), &err);
+	assert(ret);
+
+	Vehicle vehicle;
+	vehicle.id = 42;
+	vehicle.plate = "ABC-1234";
+	vehicle.pos.latitude = 39.9042;
+	vehicle.pos.longitude = 116.4074;
+	vehicle.history[0].latitude = 39.9040;
+	vehicle.history[0].longitude = 116.4070;
+	vehicle.history[1].latitude = 39.9041;
+	vehicle.history[1].longitude = 116.4072;
+	vehicle.history[2].latitude = 39.9042;
+	vehicle.history[2].longitude = 116.4074;
+	ret = writeb(h, "vehicle1", &vehicle, sizeof(vehicle), &err);
 	assert(ret);
 
 	printf("exit\n");

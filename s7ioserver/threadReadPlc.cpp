@@ -202,8 +202,8 @@ void threadReadPlc(PlcConfig* plc, AppConfig* config) {
                 }
 
                 if (!write_ok) {
-                    printf("[%s] writeb failed for tag '%s', reconnecting gPlat...\n",
-                           plc->name.c_str(), tag->tagname.c_str());
+                    printf("[%s] writeb failed for tag '%s', error = %d, reconnecting gPlat...\n",
+                           plc->name.c_str(), tag->tagname.c_str(), gplat_error);
                     conn = reconnectGplat(*config);
                     if (conn <= 0) {
                         printf("[%s] Read thread exiting: gPlat reconnect failed.\n", plc->name.c_str());

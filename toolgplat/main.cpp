@@ -776,6 +776,72 @@ void HandleDesc()
 	DescB();
 }
 
+void HandleHelp(const std::vector<std::string>& words)
+{
+	if (words.size() == 1)
+	{
+		std::cout << "Available commands:" << std::endl;
+		std::cout << "delete" << std::endl;
+		std::cout << "desc" << std::endl;
+		std::cout << "select" << std::endl;
+		std::cout << "clear" << std::endl;
+		std::cout << "conn" << std::endl;
+		std::cout << "create" << std::endl;
+		return;
+	}
+
+	std::string cmd = words[1];
+
+	if (cmd == "delete")
+	{
+		std::cout << "Usage: delete <tagName>" << std::endl;
+		std::cout << "Description: Deletes the specified tag from the current board." << std::endl;
+	}
+	else if (cmd == "desc")
+	{
+		std::cout << "Usage: desc" << std::endl;
+		std::cout << "Description: Describes the current board, showing total size, remaining size, and tag count." << std::endl;
+	}
+	else if (cmd == "select")
+	{
+		std::cout << "Usage: select <tagName>" << std::endl;
+		std::cout << "Description: Selects the specified tag and displays its value and metadata." << std::endl;
+	}
+	else if (cmd == "clear")
+	{
+		std::cout << "Usage: clear all" << std::endl;
+		std::cout << "Description: Clears all tags from the current board." << std::endl;
+	}
+	else if (cmd == "delete")
+		{
+		std::cout << "Usage: delete <tagName>" << std::endl;
+		std::cout << "Description: Deletes the specified tag from the current board." << std::endl;
+	}
+	else if (cmd == "create")
+	{
+		std::cout << "Usage: create <tagName> <typeName> [arraySize]" << std::endl;
+		std::cout << "Description: Creates a new tag with the specified name, type, and optional array size." << std::endl;
+		std::cout << "typeName: Boolean | Int16 | UInt16 | Int32 | UInt32 | Int64 | UInt64 | Single | Double | String" << std::endl;
+		std::cout << "Example: create temperature Single" << std::endl;
+		std::cout << "Example: create sensorValues Int32 10" << std::endl;
+		std::cout << "Example: create alarmMessage String" << std::endl;
+		std::cout << "Example: create sensor1 SensorData" << std::endl;
+		std::cout << "Example: create sensorarray SensorData 3" << std::endl;
+		std::cout << "--------------------------------------------------------------------------" << std::endl;
+		std::cout << "Usage: create tag from config file <fileName>" << std::endl;
+		std::cout << "Description: Creates tags based on a configuration file" << std::endl;
+		std::cout << "Example: create tag from config file plc_tags.ini" << std::endl;
+		std::cout << "--------------------------------------------------------------------------" << std::endl;
+		std::cout << "Usage: create tag from script file <fileName>" << std::endl;
+		std::cout << "Description: Creates tags based on a script file" << std::endl;
+		std::cout << "Example: create tag from script file tags.txt" << std::endl;
+	}
+	else
+	{
+		std::cout << "No help available for command: " << cmd << std::endl;
+	}
+}
+
 void Analyse(const std::vector<std::string>& words)
 {
 	if (words.empty())
@@ -786,6 +852,12 @@ void Analyse(const std::vector<std::string>& words)
 	std::transform(cmd.begin(), cmd.end(), cmd.begin(),
 		[](unsigned char c)
 		{ return std::tolower(c); });
+
+	if (cmd == "help")
+	{
+		HandleHelp(words);
+		return;
+	}
 
 	if (cmd == "clear")
 	{

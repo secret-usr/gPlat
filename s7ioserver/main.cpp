@@ -62,24 +62,10 @@ int main(int argc, char* argv[])
     std::thread writeThread(threadWritePlc, &config);
 
     // 主线程等待退出命令或信号
-    std::string input;
-    while (g_running) {
-        if (std::cin >> input) {
-            if (input == "q" || input == "quit") {
-                g_running = false;
-                printf("Shutting down...\n");
-                break;
-            } else {
-                printf("Unknown command. Type 'q' to quit.\n");
-            }
-        } else {
-            // stdin关闭（如以daemon运行），等待信号
-            while (g_running) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            }
-            break;
-        }
-    }
+    while (true) {
+        if (!g_running) break;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }   
 
     g_running = false;
 

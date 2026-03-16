@@ -84,7 +84,7 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <RemoteOutRelDir>Bin</RemoteOutRelDir>
+    <RemoteOutRelDir>bin</RemoteOutRelDir>
   </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="src\core\s7_client.cpp" />
@@ -126,8 +126,8 @@
       <AdditionalIncludeDirectories>D:\Program\Linux\gPlat\snap7\src\sys;D:\Program\Linux\gPlat\snap7\src\lib;D:\Program\Linux\gPlat\snap7\src\core;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <RemotePostBuildEvent>
-      <Command>sudo cp $(RemoteRootDir)/$(Platform)/$(Configuration)/lib$(ProjectName).so /usr/local/lib/
-sudo ldconfig</Command>
+      <Command>sudo cp $(RemoteRootDir)/bin/lib$(ProjectName).so $(RemoteRootDir)/lib
+</Command>
     </RemotePostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

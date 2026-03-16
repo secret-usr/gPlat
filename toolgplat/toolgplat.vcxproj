@@ -78,7 +78,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(ProjectDir)..\$(Platform)\$(Configuration)\</OutDir>
     <TargetExt />
-    <RemoteOutRelDir>Bin</RemoteOutRelDir>
+    <RemoteOutRelDir>bin</RemoteOutRelDir>
   </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
@@ -89,7 +89,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>
       <LibraryDependencies>higplat;readline</LibraryDependencies>
-      <AdditionalLibraryDirectories>%(Link.AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>D:\Program\Linux\gPlat\lib;%(Link.AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <ClCompile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>

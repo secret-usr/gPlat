@@ -85,7 +85,7 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <RemoteOutRelDir>Bin</RemoteOutRelDir>
+    <RemoteOutRelDir>bin</RemoteOutRelDir>
     <RemoteDeployDir>$(RemoteRootDir)/$(ProjectName)</RemoteDeployDir>
   </PropertyGroup>
   <ItemGroup>
@@ -99,7 +99,7 @@
       <CppLanguageStandard>c++17</CppLanguageStandard>
     </ClCompile>
     <RemotePostBuildEvent>
-      <Command>sudo cp $(RemoteRootDir)/$(Platform)/$(Configuration)/lib$(ProjectName).so /usr/local/lib/</Command>
+      <Command>sudo cp $(RemoteRootDir)/bin/lib$(ProjectName).so $(RemoteRootDir)/lib</Command>
     </RemotePostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

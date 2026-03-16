@@ -80,7 +80,7 @@
     <CopyAdditionalIncludes>false</CopyAdditionalIncludes>
     <LibraryPath>
     </LibraryPath>
-    <RemoteOutRelDir>Bin</RemoteOutRelDir>
+    <RemoteOutRelDir>bin</RemoteOutRelDir>
     <OutDir>$(ProjectDir)..\$(Platform)\$(Configuration)\</OutDir>
     <TargetExt />
   </PropertyGroup>
@@ -92,7 +92,7 @@
     <ClCompile />
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>D:\Program\Linux\gPlat\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <SharedLibrarySearchPath>%(SharedLibrarySearchPath)</SharedLibrarySearchPath>
       <LibraryDependencies>higplat</LibraryDependencies>
       <AdditionalOptions>-Wl,-rpath,/home/gyb/projects/gPlature/bin/x64/Debug</AdditionalOptions>

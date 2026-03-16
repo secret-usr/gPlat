@@ -755,7 +755,7 @@ extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize,
 	return true;
 }
 
-extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error)
+bool writeb_(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error, int postornot)
 {
 	// 参数校验
 	if (!tagname || !value || !error || actsize <= 0) {
@@ -775,6 +775,7 @@ extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize
 	msg.head.bodysize = actsize;
 	msg.head.offset = 0;
 	msg.head.subsize = 0;
+	msg.head.start = postornot;	// 1表示触发发布，0表示不触发发布
 
 	// 安全拷贝字符串
 	strncpy(msg.head.qname, "BOARD", sizeof(msg.head.qname) - 1);
@@ -810,6 +811,16 @@ extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize
 
 	*error = msg.head.error;
 	return (*error == 0);
+}
+
+extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error)
+{
+	return writeb_(sockfd, tagname, value, actsize, error, 1);	// 触发发布
+}
+
+extern "C" bool writeb_notpost(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error)
+{
+	return writeb_(sockfd, tagname, value, actsize, error, 0);	// 不触发发布
 }
 
 extern "C" bool readb_string(int sockfd, const char* tagname, char* value, int buffersize, unsigned int* error, timespec* timestamp)
@@ -967,7 +978,7 @@ extern "C" bool readb_string2(int sockfd, const char* tagname, std::string& valu
 	return true;
 }
 
-extern "C" bool writeb_string(int sockfd, const char* tagname, const char* value, unsigned int* error)
+bool writeb_string_(int sockfd, const char* tagname, const char* value, unsigned int* error, int postornot)
 {
 	int strlength = strlen((const char*)value);
 
@@ -981,7 +992,7 @@ extern "C" bool writeb_string(int sockfd, const char* tagname, const char* value
 		*error = ERROR_PARAMETER_SIZE;
 		return false;
 	}
-	
+
 	// 初始化消息头
 	MSGSTRUCT msg{};
 	msg.head.id = WRITEBSTRING;
@@ -989,6 +1000,7 @@ extern "C" bool writeb_string(int sockfd, const char* tagname, const char* value
 	msg.head.bodysize = strlength;
 	msg.head.offset = 0;
 	msg.head.subsize = 0;
+	msg.head.start = postornot;	// 1表示触发发布，0表示不触发发布
 
 	// 安全拷贝字符串
 	strncpy(msg.head.qname, "BOARD", sizeof(msg.head.qname) - 1);
@@ -1022,6 +1034,16 @@ extern "C" bool writeb_string(int sockfd, const char* tagname, const char* value
 	return (*error == 0);
 }
 
+extern "C" bool writeb_string(int sockfd, const char* tagname, const char* value, unsigned int* error)
+{
+	return writeb_string_(sockfd, tagname, value, error, 1);	// 触发发布
+}
+
+extern "C" bool writeb_string_notpost(int sockfd, const char* tagname, const char* value, unsigned int* error)
+{
+	return writeb_string_(sockfd, tagname, value, error, 0);	// 不触发发布
+}
+
 extern "C" bool writeb_string2(int sockfd, const char* tagname, std::string value, unsigned int* error)
 {
 	// 确保字符串以 null 结尾
@@ -1032,7 +1054,7 @@ extern "C" bool writeb_string2(int sockfd, const char* tagname, std::string valu
 	// mark
 	// 直接传递 c_str()，因为 writeb_string 已经处理了字符串长度和 null 结尾问题
 	// 但是这样会损失效率，因为没有利用std::string的length()方法，length()方法比strlen()更快，因为它不需要遍历字符串
-	return writeb_string(sockfd, tagname, value.c_str(), error);
+	return writeb_string_(sockfd, tagname, value.c_str(), error, 1);		// 触发发布
 }
 
 extern "C" bool subscribe(int sockfd, const char* tagname, unsigned int* error)

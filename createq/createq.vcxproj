@@ -77,7 +77,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetExt />
-    <RemoteOutRelDir>Bin</RemoteOutRelDir>
+    <RemoteOutRelDir>bin</RemoteOutRelDir>
     <OutDir>$(ProjectDir)..\$(Platform)\$(Configuration)\</OutDir>
     <CopyAdditionalIncludes>false</CopyAdditionalIncludes>
   </PropertyGroup>
@@ -88,7 +88,7 @@
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>
-      <AdditionalLibraryDirectories>%(Link.AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>D:\Program\Linux\gPlat\lib;%(Link.AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <LibraryDependencies>higplat</LibraryDependencies>
     </Link>
     <ClCompile>

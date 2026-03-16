@@ -92,6 +92,7 @@ extern "C" bool writeq(int sockfd, const char* qname, void* record, int actsize,
 extern "C" bool clearq(int sockfd, const char* qname, unsigned int* error);
 extern "C" bool readb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error, timespec* timestamp = 0);
 extern "C" bool writeb(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error);
+extern "C" bool writeb_notpost(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error);
 extern "C" bool subscribe(int sockfd, const char* tagname, unsigned int* error);
 extern "C" bool subscribedelaypost(int sockfd, const char* tagname, const char* eventname, int delaytime, unsigned int* error);
 extern "C" bool createtag(int sockfd, const char* tagname, int tagsize, void* type, int typesize, unsigned int* error);

@@ -11,6 +11,9 @@
 #include "../include/snap7.h"
 #include "s7config.h"
 
+extern "C" bool writeb_notpost(int sockfd, const char* tagname, void* value, int actsize, unsigned int* error);
+extern "C" bool writeb_string_notpost(int sockfd, const char* tagname, const char* value, unsigned int* error);
+
 extern std::atomic<bool> g_running;
 
 // ---- 字节序转换 ----
@@ -132,8 +135,7 @@ void threadReadPlc(PlcConfig* plc, AppConfig* config) {
                 if (!changed) continue;
 
                 // 更新last_raw_value
-                memcpy(tag->last_raw_value.data(), raw, tag->byte_size);
-                tag->first_read = false;
+                memcpy(tag->last_raw_value.data(), raw, tag->byte_size);   
 
                 // 按类型转换并写入Board
                 bool write_ok = false;
@@ -142,7 +144,13 @@ void threadReadPlc(PlcConfig* plc, AppConfig* config) {
                     case S7DataType::BOOL: {
                         uint8_t byte_val = raw[0];
                         bool bval = (byte_val >> tag->bit_offset) & 0x01;
-                        write_ok = writeb(conn, tag->tagname.c_str(), &bval, sizeof(bool), &gplat_error);
+
+                        if (tag->first_read) {
+                            write_ok = writeb_notpost(conn, tag->tagname.c_str(), &bval, sizeof(bool), &gplat_error);
+						}
+                        else {
+                            write_ok = writeb(conn, tag->tagname.c_str(), &bval, sizeof(bool), &gplat_error);
+						}
                         break;
                     }
                     case S7DataType::INT: {
@@ -151,14 +159,26 @@ void threadReadPlc(PlcConfig* plc, AppConfig* config) {
                         raw16 = swap16(raw16);
                         short val;
                         memcpy(&val, &raw16, 2);
-                        write_ok = writeb(conn, tag->tagname.c_str(), &val, sizeof(short), &gplat_error);
+
+                        if (tag->first_read) {
+                            write_ok = writeb_notpost(conn, tag->tagname.c_str(), &val, sizeof(short), &gplat_error);
+                        }
+                        else {
+                            write_ok = writeb(conn, tag->tagname.c_str(), &val, sizeof(short), &gplat_error);
+                        }
                         break;
                     }
                     case S7DataType::WORD: {
                         uint16_t raw16;
                         memcpy(&raw16, raw, 2);
                         uint16_t val = swap16(raw16);
-                        write_ok = writeb(conn, tag->tagname.c_str(), &val, sizeof(uint16_t), &gplat_error);
+
+                        if (tag->first_read) {
+                            write_ok = writeb_notpost(conn, tag->tagname.c_str(), &val, sizeof(uint16_t), &gplat_error);
+                        }
+                        else {
+                            write_ok = writeb(conn, tag->tagname.c_str(), &val, sizeof(uint16_t), &gplat_error);
+                        }
                         break;
                     }
                     case S7DataType::DINT: {
@@ -167,14 +187,26 @@ void threadReadPlc(PlcConfig* plc, AppConfig* config) {
                         raw32 = swap32(raw32);
                         int val;
                         memcpy(&val, &raw32, 4);
-                        write_ok = writeb(conn, tag->tagname.c_str(), &val, sizeof(int), &gplat_error);
+
+                        if (tag->first_read) {
+                            write_ok = writeb_notpost(conn, tag->tagname.c_str(), &val, sizeof(int), &gplat_error);
+                        }
+                        else {
+                            write_ok = writeb(conn, tag->tagname.c_str(), &val, sizeof(int), &gplat_error);
+                        }
                         break;
                     }
                     case S7DataType::DWORD: {
                         uint32_t raw32;
                         memcpy(&raw32, raw, 4);
                         uint32_t val = swap32(raw32);
-                        write_ok = writeb(conn, tag->tagname.c_str(), &val, sizeof(uint32_t), &gplat_error);
+
+                        if (tag->first_read) {
+                            write_ok = writeb_notpost(conn, tag->tagname.c_str(), &val, sizeof(uint32_t), &gplat_error);
+                        }
+                        else {
+                            write_ok = writeb(conn, tag->tagname.c_str(), &val, sizeof(uint32_t), &gplat_error);
+                        }
                         break;
                     }
                     case S7DataType::REAL: {
@@ -183,7 +215,13 @@ void threadReadPlc(PlcConfig* plc, AppConfig* config) {
                         raw32 = swap32(raw32);
                         float val;
                         memcpy(&val, &raw32, 4);
-                        write_ok = writeb(conn, tag->tagname.c_str(), &val, sizeof(float), &gplat_error);
+
+                        if (tag->first_read) {
+                            write_ok = writeb_notpost(conn, tag->tagname.c_str(), &val, sizeof(float), &gplat_error);
+                        }
+                        else {
+                            write_ok = writeb(conn, tag->tagname.c_str(), &val, sizeof(float), &gplat_error);
+                        }
                         break;
                     }
                     case S7DataType::STRING: {
@@ -196,10 +234,17 @@ void threadReadPlc(PlcConfig* plc, AppConfig* config) {
                         memcpy(strbuf, raw + 2, actual_len);
                         strbuf[actual_len] = '\0';
 
-                        write_ok = writeb_string(conn, tag->tagname.c_str(), strbuf, &gplat_error);
+                        if (tag->first_read) {
+                            write_ok = writeb_string_notpost(conn, tag->tagname.c_str(), strbuf, &gplat_error);
+                        }
+                        else {
+                            write_ok = writeb_string(conn, tag->tagname.c_str(), strbuf, &gplat_error);
+                        }
                         break;
                     }
                 }
+
+                tag->first_read = false;
 
                 if (!write_ok) {
                     printf("[%s] writeb failed for tag '%s', error = %d, reconnecting gPlat...\n",

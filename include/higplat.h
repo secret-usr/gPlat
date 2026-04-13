@@ -1,7 +1,9 @@
 ﻿#if !defined(HIGPLAT_H_INCLUDED_)
 #define HIGPLAT_H_INCLUDED_
 
+#include <cstring>
 #include <string>
+#include <type_traits>
 
 #define ERROR_DQFILE_NOT_FOUND			1
 #define ERROR_DQ_NOT_OPEN				2
@@ -105,6 +107,7 @@ extern "C" bool writeb_string2(int sockfd, const char* tagname, std::string valu
 extern "C" bool readtype(int sockfd, const char* qbdname, const char* tagname, void* inbuff, int buffsize, int* ptypesize, unsigned int* error);
 extern "C" bool clearb(int sockfd, unsigned int* error);
 extern "C" bool readboardinfo(int sockfd, const void* info, int infosize, unsigned int* error);
+extern "C" bool createqueue(int sockfd, const char* queuename, int recordsize, int recordnum, int operatemode, void* type, int typesize, unsigned int* error);
 
 extern "C" bool write_plc_string(int sockfd, const char* tagname, std::string str, unsigned int* error);
 extern "C" bool write_plc_bool(int sockfd, const char* tagname, bool value, unsigned int* error);
@@ -139,5 +142,50 @@ extern "C" bool ClearB(const char* lpBoardName);
 extern "C" bool GetLastErrorQ();
 extern "C" bool ReadType(const char* lpDqName, const char* lpItemName, void* inBuff, int buffSize, int* pTypeSize);
 extern "C" bool ReadBoardInfo(const char* lpBoardName, BOARD_INFO* boardinfo);
+
+template<typename T, typename CharT>
+T read_value(CharT* buffer) {
+	static_assert(std::is_same_v<std::remove_cv_t<CharT>, char>, "buffer must be char*");
+
+	if constexpr (std::is_same_v<T, std::string>) {
+		return std::string(buffer);
+	}
+	else if constexpr (std::is_same_v<T, const char*>) {
+		return buffer;
+	}
+	else if constexpr (std::is_same_v<T, char*>) {
+		static_assert(!std::is_const_v<CharT>, "cannot return char* from const char*");
+		return buffer;
+	}
+	else {
+		static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable");
+		T result{};
+		std::memcpy(&result, buffer, sizeof(T));
+		return result;
+	}
+}
+
+//更稳一点的字符串版本
+//如果字符串可能不是完整填满，最好再带长度：
+/*
+template<typename T>
+T read_value(const char* buffer, size_t size) {
+	if constexpr (std::is_same_v<T, std::string>) {
+		return std::string(buffer, strnlen(buffer, size));
+	}
+	else if constexpr (std::is_same_v<T, const char*>) {
+		return buffer;
+	}
+	else {
+		static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable");
+		if (size < sizeof(T)) {
+			throw std::out_of_range("buffer too small");
+		}
+		T result{};
+		std::memcpy(&result, buffer, sizeof(T));
+		return result;
+	}
+}
+*/
 
 #endif // HIGPLAT_H_INCLUDED_
